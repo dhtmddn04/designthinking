@@ -417,7 +417,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -439,7 +439,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                             ),
                           ),
                           Text(
-                            '전체 ${_currentTotal}건',
+                            '전체 $_currentTotal건',
                             style: const TextStyle(
                               fontSize: 13,
                               color: _textGray,
@@ -609,7 +609,7 @@ class _CongestionBar extends StatelessWidget {
           SizedBox(
             width: 36,
             child: Text(
-              '${count}건',
+              '$count건',
               textAlign: TextAlign.right,
               style: TextStyle(
                 fontSize: 13,
