@@ -1,70 +1,153 @@
 import 'package:flutter/material.dart';
- 
+
 // ──────────────────────────────────────────────
-//  하드코딩 더미 데이터
+//  상수 데이터
 // ──────────────────────────────────────────────
-const List<String> _locations = ['외대', '정문', '전정대'];
+const List<String> _locations = ['정문', '외대', '전정대'];
 const List<String> _congestionLevels = ['여유', '보통', '약간 혼잡', '혼잡'];
- 
-const List<_TabData> _tabs = [
-  _TabData(label: '정문'),
-  _TabData(label: '외대'),
-  _TabData(label: '전정대'),
-];
- 
-const List<_CongestionRow> _congestionRows = [
-  _CongestionRow(label: '여유',    count: 28, total: 72),
-  _CongestionRow(label: '보통',    count: 35, total: 72, highlight: true),
-  _CongestionRow(label: '약간 혼잡', count: 7,  total: 72),
-  _CongestionRow(label: '혼잡',    count: 2,  total: 72),
-];
- 
-// ──────────────────────────────────────────────
-//  모델 클래스
-// ──────────────────────────────────────────────
-class _TabData {
-  final String label;
-  const _TabData({required this.label});
-}
- 
-class _CongestionRow {
-  final String label;
-  final int count;
-  final int total;
-  final bool highlight;
-  const _CongestionRow({
-    required this.label,
-    required this.count,
-    required this.total,
-    this.highlight = false,
-  });
-}
- 
+
+// 탭 순서와 _locations 순서를 일치시킴
+const List<String> _tabLabels = ['정문', '외대', '전정대'];
+
+// 쿨다운 시간 (1시간)
+const Duration _cooldown = Duration(hours: 1);
+
 // ──────────────────────────────────────────────
 //  메인 화면 위젯
 // ──────────────────────────────────────────────
 class OpinionScreen extends StatefulWidget {
   const OpinionScreen({super.key});
- 
+
   @override
   State<OpinionScreen> createState() => _OpinionScreenState();
 }
- 
+
 class _OpinionScreenState extends State<OpinionScreen> {
   // 드롭다운 선택 상태
-  String _selectedLocation = '외대';
-  String _selectedCongestion = '혼잡';
- 
+  String _selectedLocation = '정문';
+  String _selectedCongestion = '여유';
+
   // 탭 선택 상태
   int _selectedTab = 0;
- 
+
+  // ── 혼잡도 카운트 데이터 ──────────────────────
+  // Map 구조: { '정문': { '여유': 0, '보통': 0, ... }, '외대': {...}, ... }
+  final Map<String, Map<String, int>> _counts = {
+    for (final loc in _tabLabels)
+      loc: {for (final level in _congestionLevels) level: 0},
+  };
+
+  // ── 마지막 제보 시각 (쿨다운 추적) ────────────
+  DateTime? _lastReportedAt;
+
   // 테마 색상
-  static const Color _primary = Color(0xFF3B82F6); // 파란색
+  static const Color _primary  = Color(0xFF3B82F6);
   static const Color _barColor = Color(0xFF3B82F6);
-  static const Color _barBg   = Color(0xFFE5E7EB);
+  static const Color _barBg    = Color(0xFFE5E7EB);
   static const Color _textDark = Color(0xFF111827);
   static const Color _textGray = Color(0xFF6B7280);
- 
+
+  // ── 쿨다운 남은 시간 계산 ──────────────────────
+  Duration get _remainingCooldown {
+    if (_lastReportedAt == null) return Duration.zero;
+    final elapsed = DateTime.now().difference(_lastReportedAt!);
+    if (elapsed >= _cooldown) return Duration.zero;
+    return _cooldown - elapsed;
+  }
+
+  bool get _canReport => _remainingCooldown == Duration.zero;
+
+  String get _cooldownText {
+    final r = _remainingCooldown;
+    final m = r.inMinutes;
+    final s = r.inSeconds % 60;
+    if (m > 0) return '$m분 ${s}초 후 제보 가능';
+    return '$s초 후 제보 가능';
+  }
+
+  // ── 제보 처리 ─────────────────────────────────
+  void _submitReport() {
+    if (!_canReport) {
+      _showCooldownDialog();
+      return;
+    }
+
+    setState(() {
+      _counts[_selectedLocation]![_selectedCongestion] =
+          (_counts[_selectedLocation]![_selectedCongestion] ?? 0) + 1;
+      _lastReportedAt = DateTime.now();
+    });
+
+    // 제보한 위치의 탭으로 자동 이동
+    final tabIndex = _tabLabels.indexOf(_selectedLocation);
+    if (tabIndex != -1) {
+      setState(() => _selectedTab = tabIndex);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '[$_selectedLocation] $_selectedCongestion 제보 완료! '
+          '1시간 후 다시 제보할 수 있어요.',
+        ),
+        backgroundColor: _primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  // ── 쿨다운 안내 다이얼로그 ─────────────────────
+  void _showCooldownDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.timer_outlined, color: Color(0xFFF59E0B)),
+            SizedBox(width: 8),
+            Text(
+              '잠깐!',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: Text(
+          '제보는 1시간에 한 번만 가능해요.\n\n⏱ $_cooldownText',
+          style: const TextStyle(fontSize: 14, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              '확인',
+              style: TextStyle(
+                color: Color(0xFF3B82F6),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 현재 탭의 전체 건수 ────────────────────────
+  int get _currentTotal {
+    final loc = _tabLabels[_selectedTab];
+    return _counts[loc]!.values.fold(0, (a, b) => a + b);
+  }
+
+  // ── 현재 탭의 가장 많은 혼잡도 (highlight) ──────
+  String? get _highlightLevel {
+    final loc = _tabLabels[_selectedTab];
+    final map = _counts[loc]!;
+    final total = map.values.fold(0, (a, b) => a + b);
+    if (total == 0) return null;
+    return map.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -83,7 +166,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                   color: _primary,
                 ),
               ),
- 
+
               // ── 제목 ────────────────────────
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
@@ -102,20 +185,16 @@ class _OpinionScreenState extends State<OpinionScreen> {
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
                   '실제 정류장이나 버스의 혼잡도를 제보해 주세요.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: _textGray,
-                  ),
+                  style: TextStyle(fontSize: 13, color: _textGray),
                 ),
               ),
               const SizedBox(height: 24),
- 
+
               // ── 드롭다운 영역 ────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    // 제보 위치
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,7 +218,6 @@ class _OpinionScreenState extends State<OpinionScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // 체감 혼잡도
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +244,40 @@ class _OpinionScreenState extends State<OpinionScreen> {
                 ),
               ),
               const SizedBox(height: 16),
- 
+
+              // ── 쿨다운 안내 배너 (쿨다운 중일 때만 표시) ──
+              if (!_canReport)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFBBF24)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.timer_outlined,
+                            size: 16, color: Color(0xFFD97706)),
+                        const SizedBox(width: 8),
+                        Text(
+                          _cooldownText,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF92400E),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               // ── 제보하기 버튼 ─────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -174,22 +285,21 @@ class _OpinionScreenState extends State<OpinionScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      // TODO: API 연동 시 구현
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('제보가 접수되었습니다! (더미)')),
-                      );
-                    },
-                    icon: const Icon(Icons.play_arrow, size: 20),
-                    label: const Text(
-                      '제보하기',
-                      style: TextStyle(
+                    onPressed: _submitReport,
+                    icon: Icon(
+                      _canReport ? Icons.play_arrow : Icons.lock_clock,
+                      size: 20,
+                    ),
+                    label: Text(
+                      _canReport ? '제보하기' : '제보 불가 (쿨다운 중)',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _primary,
+                      backgroundColor:
+                          _canReport ? _primary : const Color(0xFF9CA3AF),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -200,7 +310,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                 ),
               ),
               const SizedBox(height: 32),
- 
+
               // ── 실시간 제보 현황 헤더 ──────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -244,7 +354,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                 ),
               ),
               const SizedBox(height: 16),
- 
+
               // ── 탭 바 ────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -255,7 +365,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                   ),
                   padding: const EdgeInsets.all(4),
                   child: Row(
-                    children: List.generate(_tabs.length, (i) {
+                    children: List.generate(_tabLabels.length, (i) {
                       final isSelected = _selectedTab == i;
                       return Expanded(
                         child: GestureDetector(
@@ -264,18 +374,18 @@ class _OpinionScreenState extends State<OpinionScreen> {
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
-                              color: isSelected ? _primary : Colors.transparent,
+                              color: isSelected
+                                  ? _primary
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(7),
                             ),
                             alignment: Alignment.center,
                             child: Text(
-                              _tabs[i].label,
+                              _tabLabels[i],
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: isSelected
-                                    ? Colors.white
-                                    : _textGray,
+                                color: isSelected ? Colors.white : _textGray,
                               ),
                             ),
                           ),
@@ -286,7 +396,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                 ),
               ),
               const SizedBox(height: 16),
- 
+
               // ── 혼잡도 현황 카드 ──────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -313,7 +423,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _tabs[_selectedTab].label,
+                            _tabLabels[_selectedTab],
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -321,7 +431,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                             ),
                           ),
                           Text(
-                            '전체 72건',
+                            '전체 ${_currentTotal}건',
                             style: const TextStyle(
                               fontSize: 13,
                               color: _textGray,
@@ -330,17 +440,30 @@ class _OpinionScreenState extends State<OpinionScreen> {
                         ],
                       ),
                       const SizedBox(height: 18),
- 
+
                       // 혼잡도 바 리스트
-                      ..._congestionRows.map(
-                        (row) => _CongestionBar(row: row, barColor: _barColor, barBg: _barBg),
-                      ),
+                      ...(() {
+                        final loc = _tabLabels[_selectedTab];
+                        final total = _currentTotal;
+                        final highlight = _highlightLevel;
+                        return _congestionLevels.map((level) {
+                          final count = _counts[loc]![level] ?? 0;
+                          return _CongestionBar(
+                            label: level,
+                            count: count,
+                            total: total,
+                            highlight: highlight != null && level == highlight,
+                            barColor: _barColor,
+                            barBg: _barBg,
+                          );
+                        });
+                      })(),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
- 
+
               // ── 하단 안내 문구 ────────────────
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
@@ -359,7 +482,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
       ),
     );
   }
- 
+
   // ── 드롭다운 공통 빌더 ──────────────────────
   Widget _buildDropdown({
     required String value,
@@ -393,25 +516,31 @@ class _OpinionScreenState extends State<OpinionScreen> {
     );
   }
 }
- 
+
 // ──────────────────────────────────────────────
 //  혼잡도 바 행 위젯
 // ──────────────────────────────────────────────
 class _CongestionBar extends StatelessWidget {
-  final _CongestionRow row;
+  final String label;
+  final int count;
+  final int total;
+  final bool highlight;
   final Color barColor;
   final Color barBg;
- 
+
   const _CongestionBar({
-    required this.row,
+    required this.label,
+    required this.count,
+    required this.total,
+    required this.highlight,
     required this.barColor,
     required this.barBg,
   });
- 
+
   @override
   Widget build(BuildContext context) {
-    final ratio = row.total > 0 ? row.count / row.total : 0.0;
- 
+    final ratio = total > 0 ? count / total : 0.0;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
@@ -420,11 +549,11 @@ class _CongestionBar extends StatelessWidget {
           SizedBox(
             width: 64,
             child: Text(
-              row.label,
+              label,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: row.highlight ? FontWeight.w700 : FontWeight.w400,
-                color: row.highlight
+                fontWeight: highlight ? FontWeight.w700 : FontWeight.w400,
+                color: highlight
                     ? const Color(0xFF111827)
                     : const Color(0xFF6B7280),
               ),
@@ -437,15 +566,13 @@ class _CongestionBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
               child: Stack(
                 children: [
-                  // 배경
                   Container(height: 10, color: barBg),
-                  // 채워지는 부분
                   FractionallySizedBox(
-                    widthFactor: ratio,
+                    widthFactor: ratio.clamp(0.0, 1.0),
                     child: Container(
                       height: 10,
                       decoration: BoxDecoration(
-                        color: row.highlight
+                        color: highlight
                             ? barColor
                             : const Color(0xFFBFDBFE),
                         borderRadius: BorderRadius.circular(4),
@@ -461,12 +588,12 @@ class _CongestionBar extends StatelessWidget {
           SizedBox(
             width: 36,
             child: Text(
-              '${row.count}건',
+              '${count}건',
               textAlign: TextAlign.right,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: row.highlight ? FontWeight.w700 : FontWeight.w400,
-                color: row.highlight
+                fontWeight: highlight ? FontWeight.w700 : FontWeight.w400,
+                color: highlight
                     ? const Color(0xFF111827)
                     : const Color(0xFF6B7280),
               ),
