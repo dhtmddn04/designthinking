@@ -6,15 +6,15 @@ import 'package:flutter/material.dart';
 
 class TimetableEntry {
   final String day;
-  final int startTime;
-  final int duration;
+  final int startMinute;
+  final int endMinute;
   final String room;
   final Color color;
 
   TimetableEntry({
     required this.day,
-    required this.startTime,
-    required this.duration,
+    required this.startMinute,
+    required this.endMinute,
     required this.room,
     required this.color,
   });
@@ -23,50 +23,50 @@ class TimetableEntry {
 final List<TimetableEntry> initialTimetable = [
   TimetableEntry(
     day: '월',
-    startTime: 9,
-    duration: 2,
+    startMinute: 9 * 60,
+    endMinute: 11 * 60,
     room: '공학관 301',
     color: Colors.blue,
   ),
   TimetableEntry(
     day: '월',
-    startTime: 13,
-    duration: 3,
+    startMinute: 13 * 60,
+    endMinute: 16 * 60,
     room: '본관 201',
     color: Colors.green,
   ),
   TimetableEntry(
     day: '화',
-    startTime: 10,
-    duration: 2,
+    startMinute: 10 * 60 + 15,
+    endMinute: 12 * 60,
     room: '공학관 205',
     color: Colors.purple,
   ),
   TimetableEntry(
     day: '수',
-    startTime: 9,
-    duration: 2,
+    startMinute: 9 * 60,
+    endMinute: 11 * 60,
     room: '공학관 301',
     color: Colors.blue,
   ),
   TimetableEntry(
     day: '수',
-    startTime: 14,
-    duration: 2,
+    startMinute: 14 * 60 + 30,
+    endMinute: 16 * 60,
     room: '중앙도서관 501',
     color: Colors.orange,
   ),
   TimetableEntry(
     day: '목',
-    startTime: 10,
-    duration: 2,
+    startMinute: 10 * 60,
+    endMinute: 12 * 60,
     room: '공학관 205',
     color: Colors.purple,
   ),
   TimetableEntry(
     day: '금',
-    startTime: 13,
-    duration: 3,
+    startMinute: 13 * 60,
+    endMinute: 16 * 60,
     room: '본관 201',
     color: Colors.green,
   ),
@@ -74,7 +74,6 @@ final List<TimetableEntry> initialTimetable = [
 
 // ─────────────────────────────────────────────
 // 프로필 탭 메인 화면
-// main_screen.dart에서 ProfileScreen()으로 연결되는 화면
 // ─────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
@@ -144,7 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 // ─────────────────────────────────────────────
-// 1. 로그인 화면
+// 로그인 화면
 // ─────────────────────────────────────────────
 
 class LoginView extends StatefulWidget {
@@ -184,7 +183,6 @@ class _LoginViewState extends State<LoginView> {
             child: Column(
               children: [
                 const SizedBox(height: 36),
-
                 Container(
                   width: 74,
                   height: 74,
@@ -212,9 +210,7 @@ class _LoginViewState extends State<LoginView> {
                     size: 38,
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 const Text(
                   '로그인',
                   style: TextStyle(
@@ -223,9 +219,7 @@ class _LoginViewState extends State<LoginView> {
                     color: Color(0xFF111827),
                   ),
                 ),
-
                 const SizedBox(height: 5),
-
                 const Text(
                   '계정에 로그인하세요',
                   style: TextStyle(
@@ -233,7 +227,6 @@ class _LoginViewState extends State<LoginView> {
                     color: Color(0xFF6B7280),
                   ),
                 ),
-
                 const SizedBox(height: 34),
 
                 _buildLabel('아이디'),
@@ -337,7 +330,7 @@ class _LoginViewState extends State<LoginView> {
 }
 
 // ─────────────────────────────────────────────
-// 2. 회원가입 화면
+// 회원가입 화면
 // ─────────────────────────────────────────────
 
 class SignupView extends StatefulWidget {
@@ -388,9 +381,7 @@ class _SignupViewState extends State<SignupView> {
                   color: Color(0xFF111827),
                 ),
               ),
-
               const SizedBox(height: 5),
-
               const Text(
                 '새 계정을 만들어보세요',
                 style: TextStyle(
@@ -398,7 +389,6 @@ class _SignupViewState extends State<SignupView> {
                   color: Color(0xFF6B7280),
                 ),
               ),
-
               const SizedBox(height: 30),
 
               _buildLabel('아이디'),
@@ -503,7 +493,7 @@ class _SignupViewState extends State<SignupView> {
 }
 
 // ─────────────────────────────────────────────
-// 3. 로그인 후 프로필 화면
+// 로그인 후 프로필 화면
 // ─────────────────────────────────────────────
 
 class ProfileContentView extends StatelessWidget {
@@ -584,11 +574,7 @@ class ProfileContentView extends StatelessWidget {
                 ],
               ),
             ),
-
-            const Divider(
-              height: 1,
-              color: Color(0xFFE5E7EB),
-            ),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
             Expanded(
               child: SingleChildScrollView(
@@ -650,9 +636,7 @@ class ProfileContentView extends StatelessWidget {
                               ),
                             ],
                           ),
-
                           const SizedBox(height: 14),
-
                           TimetableGrid(timetable: timetable),
                         ],
                       ),
@@ -693,7 +677,7 @@ class ProfileContentView extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// 4. 시간표 편집 화면
+// 시간표 편집 화면
 // ─────────────────────────────────────────────
 
 class TimetableEditScreen extends StatefulWidget {
@@ -716,9 +700,10 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   final List<String> _days = ['월', '화', '수', '목', '금'];
   final List<String> _selectedDays = [];
 
-  int _startTime = 9;
-  int _endTime = 10;
-
+  final TextEditingController _startTimeController =
+  TextEditingController(text: '09:00');
+  final TextEditingController _endTimeController =
+  TextEditingController(text: '10:00');
   final TextEditingController _roomController = TextEditingController();
 
   final List<Color> _colors = [
@@ -737,25 +722,49 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     super.initState();
     _timetable = List.from(widget.timetable);
 
-    _roomController.addListener(() {
-      setState(() {});
-    });
+    _startTimeController.addListener(() => setState(() {}));
+    _endTimeController.addListener(() => setState(() {}));
+    _roomController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
+    _startTimeController.dispose();
+    _endTimeController.dispose();
     _roomController.dispose();
     super.dispose();
   }
 
+  int? _parseTimeToMinute(String text) {
+    final parts = text.trim().split(':');
+    if (parts.length != 2) return null;
+
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23) return null;
+    if (minute < 0 || minute > 59) return null;
+
+    return hour * 60 + minute;
+  }
+
   bool get _canAddClass {
+    final startMinute = _parseTimeToMinute(_startTimeController.text);
+    final endMinute = _parseTimeToMinute(_endTimeController.text);
+
     return _selectedDays.isNotEmpty &&
         _roomController.text.trim().isNotEmpty &&
-        _startTime < _endTime;
+        startMinute != null &&
+        endMinute != null &&
+        startMinute < endMinute;
   }
 
   void _addClass() {
-    if (!_canAddClass) return;
+    final startMinute = _parseTimeToMinute(_startTimeController.text);
+    final endMinute = _parseTimeToMinute(_endTimeController.text);
+
+    if (!_canAddClass || startMinute == null || endMinute == null) return;
 
     final Color color = _colors[_colorIndex % _colors.length];
     _colorIndex++;
@@ -763,8 +772,8 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     final List<TimetableEntry> newEntries = _selectedDays.map((day) {
       return TimetableEntry(
         day: day,
-        startTime: _startTime,
-        duration: _endTime - _startTime,
+        startMinute: startMinute,
+        endMinute: endMinute,
         room: _roomController.text.trim(),
         color: color,
       );
@@ -775,17 +784,16 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
         ..._timetable,
         ...newEntries,
       ];
+
       _selectedDays.clear();
-      _startTime = 9;
-      _endTime = 10;
+      _startTimeController.text = '09:00';
+      _endTimeController.text = '10:00';
       _roomController.clear();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<int> hours = List.generate(10, (index) => index + 9);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
@@ -840,14 +848,11 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
               ),
             ),
 
-            const Divider(
-              height: 1,
-              color: Color(0xFFE5E7EB),
-            ),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 160),
                 child: Column(
                   children: [
                     _sectionCard(
@@ -922,15 +927,10 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                   children: [
                                     _buildLabel('시작 시간'),
                                     const SizedBox(height: 8),
-                                    _buildDropdown(
-                                      value: _startTime,
-                                      items: hours,
-                                      onChanged: (value) {
-                                        if (value == null) return;
-                                        setState(() {
-                                          _startTime = value;
-                                        });
-                                      },
+                                    _buildTextField(
+                                      controller: _startTimeController,
+                                      hintText: '예: 09:15',
+                                      keyboardType: TextInputType.datetime,
                                     ),
                                   ],
                                 ),
@@ -942,15 +942,10 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                   children: [
                                     _buildLabel('종료 시간'),
                                     const SizedBox(height: 8),
-                                    _buildDropdown(
-                                      value: _endTime,
-                                      items: hours,
-                                      onChanged: (value) {
-                                        if (value == null) return;
-                                        setState(() {
-                                          _endTime = value;
-                                        });
-                                      },
+                                    _buildTextField(
+                                      controller: _endTimeController,
+                                      hintText: '예: 10:45',
+                                      keyboardType: TextInputType.datetime,
                                     ),
                                   ],
                                 ),
@@ -1073,37 +1068,6 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
       ),
     );
   }
-
-  Widget _buildDropdown({
-    required int value,
-    required List<int> items,
-    required ValueChanged<int?> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        border: Border.all(color: const Color(0xFFD1D5DB)),
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: DropdownButton<int>(
-        value: value,
-        isExpanded: true,
-        underline: const SizedBox(),
-        icon: const Icon(Icons.keyboard_arrow_down_rounded),
-        items: items.map((hour) {
-          return DropdownMenuItem<int>(
-            value: hour,
-            child: Text(
-              '$hour:00',
-              style: const TextStyle(fontSize: 14),
-            ),
-          );
-        }).toList(),
-        onChanged: onChanged,
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────
@@ -1128,133 +1092,167 @@ class TimetableGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            const SizedBox(width: _timeColumnWidth),
-            ..._days.map((day) {
-              return SizedBox(
-                width: _dayColumnWidth,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: _gap / 2),
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF9FAFB),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Text(
-                    day,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF374151),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
+    final double gridWidth =
+        _timeColumnWidth + (_dayColumnWidth + _gap) * _days.length;
 
-        const SizedBox(height: 5),
-
-        Stack(
+    return Center(
+      child: SizedBox(
+        width: gridWidth,
+        child: Column(
           children: [
-            Column(
-              children: _hours.map((hour) {
-                return Row(
-                  children: [
-                    SizedBox(
-                      width: _timeColumnWidth,
-                      height: _rowHeight,
-                      child: Center(
-                        child: Text(
-                          '$hour',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: Color(0xFF9CA3AF),
-                          ),
+            Row(
+              children: [
+                const SizedBox(width: _timeColumnWidth),
+                ..._days.map((day) {
+                  return SizedBox(
+                    width: _dayColumnWidth,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: _gap / 2),
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        day,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF374151),
                         ),
                       ),
                     ),
-                    ..._days.map((day) {
-                      final bool isOccupied = timetable.any((entry) {
-                        return entry.day == day &&
-                            hour >= entry.startTime &&
-                            hour < entry.startTime + entry.duration;
-                      });
-
-                      return Container(
-                        width: _dayColumnWidth,
-                        height: _rowHeight,
-                        margin: const EdgeInsets.all(_gap / 2),
-                        decoration: BoxDecoration(
-                          color: isOccupied
-                              ? Colors.transparent
-                              : const Color(0xFFF9FAFB),
-                          border: Border.all(
-                            color: isOccupied
-                                ? Colors.transparent
-                                : const Color(0xFFE5E7EB),
-                          ),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      );
-                    }),
-                  ],
-                );
-              }).toList(),
+                  );
+                }),
+              ],
             ),
 
-            ..._days.asMap().entries.expand((dayEntry) {
-              final int dayIndex = dayEntry.key;
-              final String day = dayEntry.value;
+            const SizedBox(height: 5),
 
-              return timetable.where((entry) => entry.day == day).map((entry) {
-                final int hourIndex = _hours.indexOf(entry.startTime);
-                if (hourIndex == -1) {
-                  return const SizedBox.shrink();
-                }
-
-                final double top = hourIndex * (_rowHeight + _gap);
-                final double left =
-                    _timeColumnWidth + dayIndex * (_dayColumnWidth + _gap);
-                final double height = entry.duration * (_rowHeight + _gap) - _gap;
-
-                return Positioned(
-                  top: top,
-                  left: left,
-                  width: _dayColumnWidth,
-                  height: height,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: _gap / 2),
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: entry.color,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Center(
-                      child: Text(
-                        entry.room,
-                        textAlign: TextAlign.center,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 7,
-                          fontWeight: FontWeight.w800,
+            Stack(
+              children: [
+                Column(
+                  children: _hours.map((hour) {
+                    return Row(
+                      children: [
+                        SizedBox(
+                          width: _timeColumnWidth,
+                          height: _rowHeight,
+                          child: Center(
+                            child: Text(
+                              '$hour',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                );
-              });
-            }),
+                        ..._days.map((day) {
+                          final int cellStart = hour * 60;
+                          final int cellEnd = (hour + 1) * 60;
+
+                          final bool isOccupied = timetable.any((entry) {
+                            return entry.day == day &&
+                                entry.startMinute < cellEnd &&
+                                entry.endMinute > cellStart;
+                          });
+
+                          return Container(
+                            width: _dayColumnWidth,
+                            height: _rowHeight,
+                            margin: const EdgeInsets.all(_gap / 2),
+                            decoration: BoxDecoration(
+                              color: isOccupied
+                                  ? Colors.transparent
+                                  : const Color(0xFFF9FAFB),
+                              border: Border.all(
+                                color: isOccupied
+                                    ? Colors.transparent
+                                    : const Color(0xFFE5E7EB),
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        }),
+                      ],
+                    );
+                  }).toList(),
+                ),
+
+                ..._days.asMap().entries.expand((dayEntry) {
+                  final int dayIndex = dayEntry.key;
+                  final String day = dayEntry.value;
+
+                  return timetable.where((entry) => entry.day == day).map(
+                        (entry) {
+                      final int timetableStartMinute = _hours.first * 60;
+                      final int timetableEndMinute = (_hours.last + 1) * 60;
+
+                      if (entry.endMinute <= timetableStartMinute ||
+                          entry.startMinute >= timetableEndMinute) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final int visibleStart =
+                      entry.startMinute < timetableStartMinute
+                          ? timetableStartMinute
+                          : entry.startMinute;
+
+                      final int visibleEnd = entry.endMinute > timetableEndMinute
+                          ? timetableEndMinute
+                          : entry.endMinute;
+
+                      final double top =
+                          ((visibleStart - timetableStartMinute) / 60) *
+                              (_rowHeight + _gap);
+
+                      final double left = _timeColumnWidth +
+                          dayIndex * (_dayColumnWidth + _gap);
+
+                      final double height =
+                          ((visibleEnd - visibleStart) / 60) *
+                              (_rowHeight + _gap) -
+                              _gap;
+
+                      return Positioned(
+                        top: top,
+                        left: left,
+                        width: _dayColumnWidth,
+                        height: height < 20 ? 20 : height,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: _gap / 2,
+                          ),
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: entry.color,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Center(
+                            child: Text(
+                              entry.room,
+                              textAlign: TextAlign.center,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 7,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }),
+              ],
+            ),
           ],
         ),
-      ],
+      ),
     );
   }
 }
