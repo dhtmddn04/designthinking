@@ -33,11 +33,37 @@ class _ReservationScreenState extends State<ReservationScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '탑승 정류장',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+              '예약',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827),
+              ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+
+            const Text(
+              '휠체어 사용자를 위한 지원 기능입니다.',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            const Text(
+              '정류장 선택',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+              ),
+            ),
+
+            const SizedBox(height: 14),
 
             Row(
               children: stops.map((stop) {
@@ -83,7 +109,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
               }).toList(),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 22),
 
             Expanded(
               child: selectedStop == null
@@ -281,6 +307,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
         Expanded(
           child: ListView.separated(
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: times.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
