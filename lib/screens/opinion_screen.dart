@@ -6,31 +6,11 @@ import 'package:flutter/material.dart';
 // ──────────────────────────────────────────────
 const List<String> _locations = ['정문', '외대', '전정대'];
 const List<String> _congestionLevels = ['여유', '보통', '약간 혼잡', '혼잡'];
-
-// 탭 순서와 _locations 순서를 일치시킴
 const List<String> _tabLabels = ['정문', '외대', '전정대'];
-
-// 쿨다운 시간 (1시간)
 const Duration _cooldown = Duration(hours: 1);
 
-// 1) mixin 추가
-class _OpinionScreenState extends State<OpinionScreen>
-    with AutomaticKeepAliveClientMixin {
-
-  // 2) true 반환 → 이 화면은 살려둬!
-  @override
-  bool get wantKeepAlive => true;
-
-  // 3) build 첫 줄에 필수 호출
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    ...
-  }
-}
-
 // ──────────────────────────────────────────────
-//  메인 화면 위젯
+//  StatefulWidget
 // ──────────────────────────────────────────────
 class OpinionScreen extends StatefulWidget {
   const OpinionScreen({super.key});
@@ -39,31 +19,45 @@ class OpinionScreen extends StatefulWidget {
   State<OpinionScreen> createState() => _OpinionScreenState();
 }
 
-class _OpinionScreenState extends State<OpinionScreen> {
-  // 드롭다운 선택 상태 (null = 아직 선택 안 됨)
+// ──────────────────────────────────────────────
+//  State  (AutomaticKeepAliveClientMixin → 탭 이동 시 State 유지)
+// ──────────────────────────────────────────────
+class _OpinionScreenState extends State<OpinionScreen>
+    with AutomaticKeepAliveClientMixin {
+
+  // ── 드롭다운 선택 상태 (null = 미선택) ──────
   String? _selectedLocation;
   String? _selectedCongestion;
 
-  // 탭 선택 상태
+  // ── 탭 선택 상태 ─────────────────────────────
   int _selectedTab = 0;
 
-  // ── 혼잡도 카운트 데이터 ──────────────────────
-  // Map 구조: { '정문': { '여유': 0, '보통': 0, ... }, '외대': {...}, ... }
+  // ── 혼잡도 카운트 데이터 ─────────────────────
   final Map<String, Map<String, int>> _counts = {
     for (final loc in _tabLabels)
       loc: {for (final level in _congestionLevels) level: 0},
   };
 
-  // ── 마지막 제보 시각 (쿨다운 추적) ────────────
+  // ── 마지막 제보 시각 ─────────────────────────
   DateTime? _lastReportedAt;
 
-  // ── 1초마다 UI 갱신용 타이머 ─────────────────
+  // ── 1초 타이머 (쿨다운 카운트다운) ───────────
   Timer? _ticker;
+
+  // ── 테마 색상 ────────────────────────────────
+  static const Color _primary  = Color(0xFF3B82F6);
+  static const Color _barColor = Color(0xFF3B82F6);
+  static const Color _barBg    = Color(0xFFE5E7EB);
+  static const Color _textDark = Color(0xFF111827);
+  static const Color _textGray = Color(0xFF6B7280);
+
+  // ── AutomaticKeepAliveClientMixin 필수 ───────
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    // 매 1초마다 setState → 쿨다운 카운트다운 실시간 반영
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_canReport) setState(() {});
     });
@@ -75,14 +69,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
     super.dispose();
   }
 
-  // 테마 색상
-  static const Color _primary  = Color(0xFF3B82F6);
-  static const Color _barColor = Color(0xFF3B82F6);
-  static const Color _barBg    = Color(0xFFE5E7EB);
-  static const Color _textDark = Color(0xFF111827);
-  static const Color _textGray = Color(0xFF6B7280);
-
-  // ── 쿨다운 남은 시간 계산 ──────────────────────
+  // ── 쿨다운 계산 ──────────────────────────────
   Duration get _remainingCooldown {
     if (_lastReportedAt == null) return Duration.zero;
     final elapsed = DateTime.now().difference(_lastReportedAt!);
@@ -92,7 +79,6 @@ class _OpinionScreenState extends State<OpinionScreen> {
 
   bool get _canReport => _remainingCooldown == Duration.zero;
 
-  // 시간 문자열만 반환 (예: "59분 59초")
   String get _cooldownText {
     final r = _remainingCooldown;
     final m = r.inMinutes;
@@ -101,9 +87,8 @@ class _OpinionScreenState extends State<OpinionScreen> {
     return '$s초';
   }
 
-  // ── 제보 처리 ─────────────────────────────────
+  // ── 제보 처리 ────────────────────────────────
   void _submitReport() {
-    // 선택 안 된 항목 안내
     if (_selectedLocation == null || _selectedCongestion == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -114,7 +99,9 @@ class _OpinionScreenState extends State<OpinionScreen> {
           ),
           backgroundColor: const Color(0xFFF59E0B),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -131,11 +118,8 @@ class _OpinionScreenState extends State<OpinionScreen> {
       _lastReportedAt = DateTime.now();
     });
 
-    // 제보한 위치의 탭으로 자동 이동
     final tabIndex = _tabLabels.indexOf(_selectedLocation!);
-    if (tabIndex != -1) {
-      setState(() => _selectedTab = tabIndex);
-    }
+    if (tabIndex != -1) setState(() => _selectedTab = tabIndex);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -150,7 +134,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
     );
   }
 
-  // ── 쿨다운 안내 다이얼로그 ─────────────────────
+  // ── 쿨다운 다이얼로그 ────────────────────────
   void _showCooldownDialog() {
     showDialog(
       context: context,
@@ -160,14 +144,11 @@ class _OpinionScreenState extends State<OpinionScreen> {
           children: [
             Icon(Icons.timer_outlined, color: Color(0xFFF59E0B)),
             SizedBox(width: 8),
-            Text(
-              '잠깐!',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
+            Text('잠깐!', style: TextStyle(fontWeight: FontWeight.w800)),
           ],
         ),
         content: Text(
-          '제보는 1시간에 한 번만 가능해요.\n\n⏱ $_cooldownText',
+          '제보는 1시간에 한 번만 가능해요.\n\n⏱ $_cooldownText 후 제보 가능합니다',
           style: const TextStyle(fontSize: 14, height: 1.6),
         ),
         actions: [
@@ -186,13 +167,13 @@ class _OpinionScreenState extends State<OpinionScreen> {
     );
   }
 
-  // ── 현재 탭의 전체 건수 ────────────────────────
+  // ── 현재 탭 전체 건수 ────────────────────────
   int get _currentTotal {
     final loc = _tabLabels[_selectedTab];
     return _counts[loc]!.values.fold(0, (a, b) => a + b);
   }
 
-  // ── 현재 탭의 가장 많은 혼잡도 (highlight) ──────
+  // ── 현재 탭 최다 혼잡도 (highlight) ──────────
   String? get _highlightLevel {
     final loc = _tabLabels[_selectedTab];
     final map = _counts[loc]!;
@@ -201,8 +182,10 @@ class _OpinionScreenState extends State<OpinionScreen> {
     return map.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
   }
 
+  // ────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin 필수
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -210,7 +193,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── 상단 아이콘 ──────────────────
+              // ── 상단 아이콘 ────────────────
               const Padding(
                 padding: EdgeInsets.only(left: 20, top: 16, bottom: 4),
                 child: Icon(
@@ -220,7 +203,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                 ),
               ),
 
-              // ── 제목 ────────────────────────
+              // ── 제목 ──────────────────────
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
@@ -243,7 +226,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── 드롭다운 영역 ────────────────
+              // ── 드롭다운 ──────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
@@ -300,7 +283,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── 제보하기 버튼 ─────────────────
+              // ── 제보하기 버튼 ──────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: SizedBox(
@@ -335,7 +318,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
               ),
               const SizedBox(height: 32),
 
-              // ── 실시간 제보 현황 헤더 ──────────
+              // ── 실시간 제보 현황 헤더 ──────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
@@ -379,7 +362,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── 탭 바 ────────────────────────
+              // ── 탭 바 ─────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
@@ -421,7 +404,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── 혼잡도 현황 카드 ──────────────
+              // ── 혼잡도 카드 ───────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
@@ -442,7 +425,6 @@ class _OpinionScreenState extends State<OpinionScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 카드 헤더
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -464,9 +446,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
                         ],
                       ),
                       const SizedBox(height: 18),
-
-                      // 혼잡도 바 리스트
-                      ...(() {
+                      ...() {
                         final loc = _tabLabels[_selectedTab];
                         final total = _currentTotal;
                         final highlight = _highlightLevel;
@@ -476,19 +456,20 @@ class _OpinionScreenState extends State<OpinionScreen> {
                             label: level,
                             count: count,
                             total: total,
-                            highlight: highlight != null && level == highlight,
+                            highlight:
+                                highlight != null && level == highlight,
                             barColor: _barColor,
                             barBg: _barBg,
                           );
                         });
-                      })(),
+                      }(),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
 
-              // ── 하단 안내 문구 (가운데 정렬) ──
+              // ── 하단 안내 문구 (가운데 정렬) ─
               const SizedBox(
                 width: double.infinity,
                 child: Text(
@@ -508,7 +489,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
     );
   }
 
-  // ── 드롭다운 공통 빌더 (null = 미선택 상태) ───
+  // ── 드롭다운 빌더 ────────────────────────────
   Widget _buildDropdown({
     required String? value,
     required String hint,
@@ -522,7 +503,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: value == null
-              ? const Color(0xFF3B82F6)   // 미선택 시 파란 테두리로 강조
+              ? const Color(0xFF3B82F6)
               : const Color(0xFFD1D5DB),
         ),
       ),
@@ -537,8 +518,10 @@ class _OpinionScreenState extends State<OpinionScreen> {
             ),
           ),
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFF6B7280)),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFF6B7280),
+          ),
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -555,7 +538,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
 }
 
 // ──────────────────────────────────────────────
-//  혼잡도 바 행 위젯
+//  혼잡도 바 위젯
 // ──────────────────────────────────────────────
 class _CongestionBar extends StatelessWidget {
   final String label;
@@ -582,7 +565,6 @@ class _CongestionBar extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
         children: [
-          // 레이블
           SizedBox(
             width: 64,
             child: Text(
@@ -597,7 +579,6 @@ class _CongestionBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // 바
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
@@ -621,7 +602,6 @@ class _CongestionBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // 건수
           SizedBox(
             width: 36,
             child: Text(
