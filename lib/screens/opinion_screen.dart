@@ -23,9 +23,9 @@ class OpinionScreen extends StatefulWidget {
 }
 
 class _OpinionScreenState extends State<OpinionScreen> {
-  // 드롭다운 선택 상태
-  String _selectedLocation = '정문';
-  String _selectedCongestion = '여유';
+  // 드롭다운 선택 상태 (null = 아직 선택 안 됨)
+  String? _selectedLocation;
+  String? _selectedCongestion;
 
   // 탭 선택 상태
   int _selectedTab = 0;
@@ -67,19 +67,36 @@ class _OpinionScreenState extends State<OpinionScreen> {
 
   // ── 제보 처리 ─────────────────────────────────
   void _submitReport() {
+    // 선택 안 된 항목 안내
+    if (_selectedLocation == null || _selectedCongestion == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _selectedLocation == null
+                ? '제보 위치를 선택해 주세요.'
+                : '체감 혼잡도를 선택해 주세요.',
+          ),
+          backgroundColor: const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
     if (!_canReport) {
       _showCooldownDialog();
       return;
     }
 
     setState(() {
-      _counts[_selectedLocation]![_selectedCongestion] =
-          (_counts[_selectedLocation]![_selectedCongestion] ?? 0) + 1;
+      _counts[_selectedLocation!]![_selectedCongestion!] =
+          (_counts[_selectedLocation!]![_selectedCongestion!] ?? 0) + 1;
       _lastReportedAt = DateTime.now();
     });
 
     // 제보한 위치의 탭으로 자동 이동
-    final tabIndex = _tabLabels.indexOf(_selectedLocation);
+    final tabIndex = _tabLabels.indexOf(_selectedLocation!);
     if (tabIndex != -1) {
       setState(() => _selectedTab = tabIndex);
     }
@@ -210,9 +227,10 @@ class _OpinionScreenState extends State<OpinionScreen> {
                           const SizedBox(height: 8),
                           _buildDropdown(
                             value: _selectedLocation,
+                            hint: '위치 선택',
                             items: _locations,
                             onChanged: (v) =>
-                                setState(() => _selectedLocation = v!),
+                                setState(() => _selectedLocation = v),
                           ),
                         ],
                       ),
@@ -233,9 +251,10 @@ class _OpinionScreenState extends State<OpinionScreen> {
                           const SizedBox(height: 8),
                           _buildDropdown(
                             value: _selectedCongestion,
+                            hint: '혼잡도 선택',
                             items: _congestionLevels,
                             onChanged: (v) =>
-                                setState(() => _selectedCongestion = v!),
+                                setState(() => _selectedCongestion = v),
                           ),
                         ],
                       ),
@@ -244,39 +263,6 @@ class _OpinionScreenState extends State<OpinionScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // ── 쿨다운 안내 배너 (쿨다운 중일 때만 표시) ──
-              if (!_canReport)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 0),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFBBF24)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.timer_outlined,
-                            size: 16, color: Color(0xFFD97706)),
-                        const SizedBox(width: 8),
-                        Text(
-                          _cooldownText,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF92400E),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
 
               // ── 제보하기 버튼 ─────────────────
               Padding(
@@ -291,9 +277,9 @@ class _OpinionScreenState extends State<OpinionScreen> {
                       size: 20,
                     ),
                     label: Text(
-                      _canReport ? '제보하기' : '제보 불가 (쿨다운 중)',
-                      style: const TextStyle(
-                        fontSize: 16,
+                      _canReport ? '제보하기' : '$_cooldownText 후 제보 가능합니다',
+                      style: TextStyle(
+                        fontSize: _canReport ? 16 : 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -464,11 +450,12 @@ class _OpinionScreenState extends State<OpinionScreen> {
               ),
               const SizedBox(height: 12),
 
-              // ── 하단 안내 문구 ────────────────
+              // ── 하단 안내 문구 (가운데 정렬) ──
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  '* 데이터는 현재 시각 기준 5분 전후 학생 제보를 기반으로 합니다.',
+                  '* 데이터는 최근 5분 이내 학생들 제보를 기반으로 합니다.',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,
                     color: Color(0xFF9CA3AF),
@@ -483,9 +470,10 @@ class _OpinionScreenState extends State<OpinionScreen> {
     );
   }
 
-  // ── 드롭다운 공통 빌더 ──────────────────────
+  // ── 드롭다운 공통 빌더 (null = 미선택 상태) ───
   Widget _buildDropdown({
-    required String value,
+    required String? value,
+    required String hint,
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
@@ -494,11 +482,22 @@ class _OpinionScreenState extends State<OpinionScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD1D5DB)),
+        border: Border.all(
+          color: value == null
+              ? const Color(0xFF3B82F6)   // 미선택 시 파란 테두리로 강조
+              : const Color(0xFFD1D5DB),
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
+          hint: Text(
+            hint,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF9CA3AF),
+            ),
+          ),
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down_rounded,
               color: Color(0xFF6B7280)),
