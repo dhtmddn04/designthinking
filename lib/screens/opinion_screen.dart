@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 // ──────────────────────────────────────────────
@@ -40,6 +41,24 @@ class _OpinionScreenState extends State<OpinionScreen> {
   // ── 마지막 제보 시각 (쿨다운 추적) ────────────
   DateTime? _lastReportedAt;
 
+  // ── 1초마다 UI 갱신용 타이머 ─────────────────
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    // 매 1초마다 setState → 쿨다운 카운트다운 실시간 반영
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_canReport) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
   // 테마 색상
   static const Color _primary  = Color(0xFF3B82F6);
   static const Color _barColor = Color(0xFF3B82F6);
@@ -57,12 +76,13 @@ class _OpinionScreenState extends State<OpinionScreen> {
 
   bool get _canReport => _remainingCooldown == Duration.zero;
 
+  // 시간 문자열만 반환 (예: "59분 59초")
   String get _cooldownText {
     final r = _remainingCooldown;
     final m = r.inMinutes;
     final s = r.inSeconds % 60;
-    if (m > 0) return '$m분 ${s}초 후 제보 가능';
-    return '$s초 후 제보 가능';
+    if (m > 0) return '$m분 $s초';
+    return '$s초';
   }
 
   // ── 제보 처리 ─────────────────────────────────
@@ -277,7 +297,9 @@ class _OpinionScreenState extends State<OpinionScreen> {
                       size: 20,
                     ),
                     label: Text(
-                      _canReport ? '제보하기' : '$_cooldownText 후 제보 가능합니다',
+                      _canReport
+                          ? '제보하기'
+                          : '$_cooldownText 후 제보 가능합니다',
                       style: TextStyle(
                         fontSize: _canReport ? 16 : 13,
                         fontWeight: FontWeight.w700,
@@ -451,8 +473,8 @@ class _OpinionScreenState extends State<OpinionScreen> {
               const SizedBox(height: 12),
 
               // ── 하단 안내 문구 (가운데 정렬) ──
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              const SizedBox(
+                width: double.infinity,
                 child: Text(
                   '* 데이터는 최근 5분 이내 학생들 제보를 기반으로 합니다.',
                   textAlign: TextAlign.center,
