@@ -468,7 +468,7 @@ class _OpinionScreenState extends State<OpinionScreen> {
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  '* 데이터는 최근 15분 이내 학생들 제보를 기반으로 합니다.',
+                  '* 데이터는 현재 시각 기준 5분 전후 학생 제보를 기반으로 합니다.',
                   style: TextStyle(
                     fontSize: 11,
                     color: Color(0xFF9CA3AF),
