@@ -13,6 +13,22 @@ const List<String> _tabLabels = ['정문', '외대', '전정대'];
 // 쿨다운 시간 (1시간)
 const Duration _cooldown = Duration(hours: 1);
 
+// 1) mixin 추가
+class _OpinionScreenState extends State<OpinionScreen>
+    with AutomaticKeepAliveClientMixin {
+
+  // 2) true 반환 → 이 화면은 살려둬!
+  @override
+  bool get wantKeepAlive => true;
+
+  // 3) build 첫 줄에 필수 호출
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    ...
+  }
+}
+
 // ──────────────────────────────────────────────
 //  메인 화면 위젯
 // ──────────────────────────────────────────────
