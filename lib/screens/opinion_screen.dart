@@ -193,23 +193,13 @@ class _OpinionScreenState extends State<OpinionScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── 상단 아이콘 ────────────────
-              const Padding(
-                padding: EdgeInsets.only(left: 20, top: 16, bottom: 4),
-                child: Icon(
-                  Icons.chat_bubble_outline_rounded,
-                  size: 28,
-                  color: _primary,
-                ),
-              ),
-
               // ── 제목 ──────────────────────
               const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.only(left: 20, right: 20, top: 60),
                 child: Text(
                   '실시간 혼잡도 제보',
                   style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 32,
                     fontWeight: FontWeight.w800,
                     color: _textDark,
                     height: 1.3,
