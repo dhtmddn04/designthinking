@@ -28,14 +28,14 @@ class _ReservationScreenState extends State<ReservationScreen> {
     return Container(
       color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(26, 56, 26, 0),
+        padding: const EdgeInsets.fromLTRB(20, 44, 20, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               '예약',
               style: TextStyle(
-                fontSize: 32,
+                fontSize: 26,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827),
               ),
@@ -46,7 +46,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
             const Text(
               '휠체어 사용자를 위한 지원 기능입니다.',
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w400,
                 color: Color(0xFF6B7280),
               ),
@@ -57,7 +57,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
             const Text(
               '정류장 선택',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF374151),
               ),
@@ -99,8 +99,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       child: Text(
                         stop,
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
