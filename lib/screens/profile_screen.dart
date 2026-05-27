@@ -792,6 +792,78 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     });
   }
 
+  String _formatMinute(int minute) {
+    final hour = minute ~/ 60;
+    final min = minute % 60;
+
+    final hourText = hour.toString().padLeft(2, '0');
+    final minuteText = min.toString().padLeft(2, '0');
+
+    return '$hourText:$minuteText';
+  }
+
+  void _deleteClass(int index) {
+    setState(() {
+      _timetable.removeAt(index);
+    });
+  }
+
+  void _confirmDeleteClass(int index) {
+    final entry = _timetable[index];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            '수업 삭제',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: Text(
+            '${entry.day}요일 ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}\n'
+                '${entry.room} 수업을 삭제할까요?',
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text(
+                '취소',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _deleteClass(index);
+              },
+              child: const Text(
+                '삭제',
+                style: TextStyle(
+                  color: Color(0xFFDC2626),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -806,6 +878,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                 children: [
                   GestureDetector(
                     onTap: () {
+                      widget.onSave(_timetable);
                       Navigator.pop(context);
                     },
                     child: Container(
@@ -960,6 +1033,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                           _buildTextField(
                             controller: _roomController,
                             hintText: '예: 공학관 301',
+                            keyboardType: TextInputType.text,
                           ),
 
                           const SizedBox(height: 22),
@@ -995,6 +1069,95 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                         ],
                       ),
                     ),
+
+                    if (_timetable.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+
+                      _sectionCard(
+                        title: '수업 목록',
+                        child: Column(
+                          children: List.generate(_timetable.length, (index) {
+                            final entry = _timetable[index];
+
+                            return Container(
+                              margin: EdgeInsets.only(
+                                bottom: index == _timetable.length - 1 ? 0 : 8,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 11,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9FAFB),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFE5E7EB),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 11,
+                                    height: 11,
+                                    decoration: BoxDecoration(
+                                      color: entry.color,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 10),
+
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${entry.day}요일 ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF111827),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          entry.room,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  GestureDetector(
+                                    onTap: () {
+                                      _confirmDeleteClass(index);
+                                    },
+                                    child: Container(
+                                      width: 30,
+                                      height: 30,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEE2E2),
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      child: const Icon(
+                                        Icons.close_rounded,
+                                        color: Color(0xFFDC2626),
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 18),
 
