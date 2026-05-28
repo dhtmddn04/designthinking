@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum TransportMode {
-  none,
-  bus,
-  walk,
-}
+enum TransportMode { none, bus, walk }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,10 +11,22 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String selectedStation = '정문';
-  TransportMode transportMode = TransportMode.none;
 
-  int waitingCount = 5;
-  int? myWaitingNumber;
+  String? activeStation;
+
+  final Map<String, TransportMode> transportModeByStation = {
+    '정문': TransportMode.none,
+    '외대': TransportMode.none,
+    '전정대': TransportMode.none,
+  };
+
+  final Map<String, int?> myWaitingNumberByStation = {
+    '정문': null,
+    '외대': null,
+    '전정대': null,
+  };
+
+  late Map<String, int> waitingCountByStation;
 
   static const int busCapacity = 40;
 
@@ -55,7 +63,30 @@ class _HomeScreenState extends State<HomeScreen> {
     },
   };
 
+  @override
+  void initState() {
+    super.initState();
+
+    waitingCountByStation = {
+      for (final station in stations)
+        station: stationData[station]!['waiting'] as int,
+    };
+  }
+
   Map<String, dynamic> get currentData => stationData[selectedStation]!;
+
+  TransportMode get transportMode =>
+      transportModeByStation[selectedStation] ?? TransportMode.none;
+
+  int get waitingCount =>
+      waitingCountByStation[selectedStation] ??
+      stationData[selectedStation]!['waiting'] as int;
+
+  int? get myWaitingNumber => myWaitingNumberByStation[selectedStation];
+
+  bool get canSelectTransportMode {
+    return activeStation == null || activeStation == selectedStation;
+  }
 
   // 지금은 GPS 시뮬레이션:
   // 정문을 선택했을 때만 정류장 50m 이내라고 가정
@@ -63,18 +94,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _changeStation(String station) {
     setState(() {
-      if (transportMode == TransportMode.bus && myWaitingNumber != null) {
-        waitingCount = waitingCount > 0 ? waitingCount - 1 : 0;
-      }
-
       selectedStation = station;
-      transportMode = TransportMode.none;
-      myWaitingNumber = null;
-      waitingCount = stationData[station]!['waiting'] as int;
     });
   }
 
   void _startBusWaiting() {
+    if (!canSelectTransportMode) return;
+
     if (!isNearStation) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -91,31 +117,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       final newNumber = waitingCount + 1;
-      waitingCount = newNumber;
-      myWaitingNumber = newNumber;
-      transportMode = TransportMode.bus;
+
+      waitingCountByStation[selectedStation] = newNumber;
+      myWaitingNumberByStation[selectedStation] = newNumber;
+      transportModeByStation[selectedStation] = TransportMode.bus;
+      activeStation = selectedStation;
     });
   }
 
   void _startWalking() {
+    if (!canSelectTransportMode) return;
+
     setState(() {
       if (transportMode == TransportMode.bus && myWaitingNumber != null) {
-        waitingCount = waitingCount > 0 ? waitingCount - 1 : 0;
-        myWaitingNumber = null;
+        waitingCountByStation[selectedStation] = waitingCount > 0
+            ? waitingCount - 1
+            : 0;
+        myWaitingNumberByStation[selectedStation] = null;
       }
 
-      transportMode = TransportMode.walk;
+      transportModeByStation[selectedStation] = TransportMode.walk;
+      activeStation = selectedStation;
     });
   }
 
   void _cancelTransportMode() {
     setState(() {
       if (transportMode == TransportMode.bus && myWaitingNumber != null) {
-        waitingCount = waitingCount > 0 ? waitingCount - 1 : 0;
+        waitingCountByStation[selectedStation] = waitingCount > 0
+            ? waitingCount - 1
+            : 0;
       }
 
-      transportMode = TransportMode.none;
-      myWaitingNumber = null;
+      transportModeByStation[selectedStation] = TransportMode.none;
+      myWaitingNumberByStation[selectedStation] = null;
+      activeStation = null;
     });
   }
 
@@ -174,10 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 4),
               const Text(
                 '최적의 이동 수단을 추천합니다',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF6B7280),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               ),
 
               const SizedBox(height: 22),
@@ -288,6 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 transportMode: transportMode,
                 station: selectedStation,
                 isNearStation: isNearStation,
+                canSelectTransportMode: canSelectTransportMode,
                 myWaitingNumber: myWaitingNumber,
                 onBusTap: _startBusWaiting,
                 onWalkTap: _startWalking,
@@ -391,35 +425,32 @@ class _RecommendationCard extends StatelessWidget {
                   ),
                   child: isBusWaiting
                       ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _InfoLine(
-                        label: '탑승 예상',
-                        value: boardingEstimate,
-                      ),
-                      const SizedBox(height: 5),
-                      _InfoLine(
-                        label: '버스 도착',
-                        value: arrival,
-                        valueColor: Color(0xFFFFF176),
-                      ),
-                      const SizedBox(height: 5),
-                      _InfoLine(
-                        label: '예상 도착시간',
-                        value: '약 $estimatedArrivalAfterMinute분 후',
-                      ),
-                    ],
-                  )
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _InfoLine(label: '탑승 예상', value: boardingEstimate),
+                            const SizedBox(height: 5),
+                            _InfoLine(
+                              label: '버스 도착',
+                              value: arrival,
+                              valueColor: Color(0xFFFFF176),
+                            ),
+                            const SizedBox(height: 5),
+                            _InfoLine(
+                              label: '예상 도착시간',
+                              value: '약 $estimatedArrivalAfterMinute분 후',
+                            ),
+                          ],
+                        )
                       : Text(
-                    isWalking
-                        ? '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다'
-                        : '$bus 버스가 $arrival 도착합니다',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                          isWalking
+                              ? '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다'
+                              : '$bus 버스가 $arrival 도착합니다',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -508,11 +539,7 @@ class _SmallInfoCard extends StatelessWidget {
               color: iconBgColor,
               borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 16,
-            ),
+            child: Icon(icon, color: iconColor, size: 16),
           ),
           const SizedBox(height: 7),
           Text(
@@ -542,6 +569,7 @@ class _TransportModeCard extends StatelessWidget {
   final TransportMode transportMode;
   final String station;
   final bool isNearStation;
+  final bool canSelectTransportMode;
   final int? myWaitingNumber;
   final VoidCallback onBusTap;
   final VoidCallback onWalkTap;
@@ -551,6 +579,7 @@ class _TransportModeCard extends StatelessWidget {
     required this.transportMode,
     required this.station,
     required this.isNearStation,
+    required this.canSelectTransportMode,
     required this.myWaitingNumber,
     required this.onBusTap,
     required this.onWalkTap,
@@ -600,7 +629,9 @@ class _TransportModeCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: isNearStation ? onBusTap : null,
+                    onPressed: isNearStation && canSelectTransportMode
+                        ? onBusTap
+                        : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
                       disabledBackgroundColor: const Color(0xFFE5E7EB),
@@ -621,9 +652,7 @@ class _TransportModeCard extends StatelessWidget {
                           const SizedBox(height: 5),
                           const Text(
                             '버스 줄서기',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.w900),
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -641,7 +670,7 @@ class _TransportModeCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: onWalkTap,
+                    onPressed: canSelectTransportMode ? onWalkTap : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF22C55E),
                       foregroundColor: Colors.white,
@@ -660,9 +689,7 @@ class _TransportModeCard extends StatelessWidget {
                           SizedBox(height: 5),
                           Text(
                             '도보',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.w900),
                           ),
                           SizedBox(height: 16),
                         ],
@@ -753,10 +780,7 @@ class _TransportModeCard extends StatelessWidget {
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                vertical: 11,
-                horizontal: 10,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
