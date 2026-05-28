@@ -25,7 +25,9 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(child: screens[selectedIndex]),
+      body: SafeArea(
+        child: IndexedStack(index: selectedIndex, children: screens),
+      ),
       bottomNavigationBar: Container(
         height: 72,
         decoration: const BoxDecoration(

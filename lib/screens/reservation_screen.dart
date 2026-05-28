@@ -220,7 +220,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                     const SizedBox(height: 16),
 
                     const Text(
-                      '탑승 5분 전에 정류장에 도착해주세요',
+                      '탑승 5분 전까지 정류장에 도착해주세요',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 13,
