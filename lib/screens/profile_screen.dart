@@ -214,8 +214,8 @@ class _LoginViewState extends State<LoginView> {
                 const Text(
                   '로그인',
                   style: TextStyle(
-                    fontSize: 23,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF111827),
                   ),
                 ),
@@ -376,8 +376,8 @@ class _SignupViewState extends State<SignupView> {
               const Text(
                 '회원가입',
                 style: TextStyle(
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
                   color: Color(0xFF111827),
                 ),
               ),

@@ -159,15 +159,15 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         color: Colors.white,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 22, 16, 24),
+          padding: const EdgeInsets.fromLTRB(20, 44, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 '강의실 이동 안내',
                 style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
                   color: Color(0xFF111827),
                 ),
               ),
@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text(
                 '최적의 이동 수단을 추천합니다',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   color: Color(0xFF6B7280),
                 ),
               ),
@@ -185,8 +185,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text(
                 '정류장 선택',
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                   color: Color(0xFF374151),
                 ),
               ),

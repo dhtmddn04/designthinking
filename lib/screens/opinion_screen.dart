@@ -195,12 +195,12 @@ class _OpinionScreenState extends State<OpinionScreen>
             children: [
               // ── 제목 ──────────────────────
               const Padding(
-                padding: EdgeInsets.only(left: 20, right: 20, top: 60),
+                padding: const EdgeInsets.fromLTRB(20, 44, 20, 0),
                 child: Text(
                   '실시간 혼잡도 제보',
                   style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
                     color: _textDark,
                     height: 1.3,
                   ),
@@ -210,8 +210,8 @@ class _OpinionScreenState extends State<OpinionScreen>
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  '실제 정류장이나 버스의 혼잡도를 제보해 주세요.',
-                  style: TextStyle(fontSize: 13, color: _textGray),
+                  '실제 정류장의 혼잡도를 제보해 주세요.',
+                  style: TextStyle(fontSize: 14, color: _textGray),
                 ),
               ),
               const SizedBox(height: 24),
