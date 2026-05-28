@@ -210,7 +210,7 @@ class _OpinionScreenState extends State<OpinionScreen>
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  '실제 정류장이나 버스의 혼잡도를 제보해 주세요.',
+                  '실제 정류장의 혼잡도를 제보해 주세요.',
                   style: TextStyle(fontSize: 14, color: _textGray),
                 ),
               ),
