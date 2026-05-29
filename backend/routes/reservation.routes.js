@@ -3,6 +3,105 @@ const db = require('../db');
 
 const router = express.Router();
 
+function getTodayString() {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function isPastTime(reservedTime) {
+  const now = new Date();
+
+  const [hour, minute] = reservedTime.split(':').map(Number);
+
+  const reservationDate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    hour,
+    minute
+  );
+
+  return reservationDate < now;
+}
+
+async function resetReservationsIfNewDay() {
+  const today = getTodayString();
+
+  const [rows] = await db.query(
+    `
+    SELECT meta_value
+    FROM app_meta
+    WHERE meta_key = ?
+    `,
+    ['reservation_reset_date']
+  );
+
+  if (rows.length === 0) {
+    await db.query(
+      `
+      INSERT INTO app_meta (meta_key, meta_value)
+      VALUES (?, ?)
+      `,
+      ['reservation_reset_date', today]
+    );
+    return;
+  }
+
+  const lastResetDate = rows[0].meta_value;
+
+  if (lastResetDate !== today) {
+    await db.query(
+      `
+      DELETE FROM reservations
+      WHERE id > 0
+      `
+    );
+
+    await db.query(
+      `
+      UPDATE app_meta
+      SET meta_value = ?
+      WHERE meta_key = ?
+      `,
+      [today, 'reservation_reset_date']
+    );
+  }
+}
+
+async function deleteExpiredReservations() {
+  const [reservations] = await db.query(
+    `
+    SELECT id, reserved_time
+    FROM reservations
+    WHERE status = 'active'
+    `
+  );
+
+  const expiredIds = reservations
+    .filter((reservation) => isPastTime(reservation.reserved_time))
+    .map((reservation) => reservation.id);
+
+  if (expiredIds.length > 0) {
+    await db.query(
+      `
+      DELETE FROM reservations
+      WHERE id IN (?)
+      `,
+      [expiredIds]
+    );
+  }
+}
+
+async function syncReservationState() {
+  await resetReservationsIfNewDay();
+  await deleteExpiredReservations();
+}
+
 router.post('/', async (req, res) => {
   const { userId, stopName, busNumber, reservedTime } = req.body;
 
@@ -13,8 +112,17 @@ router.post('/', async (req, res) => {
     });
   }
 
-  try {
-    const [users] = await db.query(
+try {
+  await syncReservationState();
+
+  if (isPastTime(reservedTime)) {
+    return res.status(400).json({
+      success: false,
+      message: '이미 지난 시간은 예약할 수 없습니다.',
+    });
+  }
+
+  const [users] = await db.query(
       'SELECT id, needs_wheelchair FROM users WHERE id = ?',
       [userId]
     );
@@ -66,6 +174,8 @@ router.post('/', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
+    await syncReservationState();
+
     const [reservations] = await db.query(
       `
       SELECT id, user_id, stop_name, bus_number, reserved_time, status, created_at
@@ -127,8 +237,10 @@ router.delete('/', async (req, res) => {
     });
   }
 
-  try {
-    const [result] = await db.query(
+try {
+  await syncReservationState();
+
+  const [result] = await db.query(
       `
       DELETE FROM reservations
       WHERE user_id = ?

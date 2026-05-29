@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'dart:async';
 
 class ReservationScreen extends StatefulWidget {
   final int? userId;
@@ -21,10 +22,46 @@ class _ReservationScreenState extends State<ReservationScreen> {
   final Map<String, String> myReservedTimesByStop = {};
   final Map<String, Set<String>> occupiedTimesByStop = {};
 
+  Timer? _reservationTimer;
+
   @override
   void initState() {
     super.initState();
+
     _loadReservations();
+
+    _reservationTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+
+      setState(() {});
+      _loadReservations();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reservationTimer?.cancel();
+    super.dispose();
+  }
+
+  bool _isPastTime(String time) {
+    //final realNow = DateTime.now();
+    //final now = DateTime(realNow.year, realNow.month, realNow.day, 14, 0);
+    final now = DateTime.now();
+
+    final parts = time.split(':');
+    final hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1]);
+
+    final reservationTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+
+    return reservationTime.isBefore(now);
   }
 
   Future<void> _loadReservations() async {
@@ -46,6 +83,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
             final reservationUserId = reservation['user_id'];
 
             if (stopName == null || reservedTime == null) continue;
+
+            if (_isPastTime(reservedTime)) continue;
 
             occupiedTimesByStop.putIfAbsent(stopName, () => <String>{});
             occupiedTimesByStop[stopName]!.add(reservedTime);
@@ -181,6 +220,75 @@ class _ReservationScreenState extends State<ReservationScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showInvalidTimeDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            '예약 불가',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          content: const Text('예약 가능한 시간이 아닙니다.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAlreadyReservedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            '예약 불가',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          content: const Text('이미 예약된 시간대입니다.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAlreadyHasReservationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            '예약 불가',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          content: const Text('이미 예약한 시간이 있습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -526,7 +634,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
               final bool isReservedByOther = isOccupied && !isMyReservation;
 
+              final bool isPastTime = _isPastTime(time);
+
               final bool isDisabled =
+                  isPastTime ||
                   isReservedByOther ||
                   (hasMyReservationAtStop && !isMyReservation);
 
@@ -557,18 +668,31 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         child: SizedBox(
                           height: 34,
                           child: ElevatedButton(
-                            onPressed: isDisabled
-                                ? null
-                                : () {
-                                    if (selectedStop == null) return;
+                            onPressed: () {
+                              if (selectedStop == null) return;
 
-                                    if (isMyReservation) {
-                                      _showReservationDialog(time);
-                                      return;
-                                    }
+                              if (isPastTime) {
+                                _showInvalidTimeDialog();
+                                return;
+                              }
 
-                                    _reserveTime(time);
-                                  },
+                              if (isReservedByOther) {
+                                _showAlreadyReservedDialog();
+                                return;
+                              }
+
+                              if (hasMyReservationAtStop && !isMyReservation) {
+                                _showAlreadyHasReservationDialog();
+                                return;
+                              }
+
+                              if (isMyReservation) {
+                                _showReservationDialog(time);
+                                return;
+                              }
+
+                              _reserveTime(time);
+                            },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isMyReservation
                                   ? const Color(0xFF00C950)
@@ -608,7 +732,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         child: SizedBox(
                           height: 34,
                           child: ElevatedButton(
-                            onPressed: isMyReservation
+                            onPressed: isMyReservation && !isPastTime
                                 ? () {
                                     _showTicketBottomSheet(time);
                                   }
