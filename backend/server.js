@@ -1,0 +1,63 @@
+const express = require('express');
+const cors = require('cors');
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Backend connected',
+  });
+});
+
+app.get('/api/home/stations', (req, res) => {
+  res.json({
+    stations: [
+      {
+        id: 'main_gate',
+        name: '정문',
+        recommend: '버스',
+        bus: '1112번',
+        arrival: '3분 후',
+        arrivalMinute: 3,
+        classTime: '15분',
+        congestion: '보통',
+        waiting: 5,
+        isNearStation: true,
+      },
+      {
+        id: 'foreign',
+        name: '외대',
+        recommend: '도보',
+        bus: '1112번',
+        arrival: '5분 후',
+        arrivalMinute: 5,
+        classTime: '12분',
+        congestion: '혼잡',
+        waiting: 18,
+        isNearStation: false,
+      },
+      {
+        id: 'engineering',
+        name: '전정대',
+        recommend: '버스',
+        bus: '1112번',
+        arrival: '7분 후',
+        arrivalMinute: 7,
+        classTime: '18분',
+        congestion: '약간 혼잡',
+        waiting: 10,
+        isNearStation: false,
+      },
+    ],
+  });
+});
+
+const PORT = 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
