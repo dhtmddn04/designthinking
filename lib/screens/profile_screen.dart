@@ -785,7 +785,20 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   final TextEditingController _endTimeController = TextEditingController(
     text: '10:00',
   );
-  final TextEditingController _roomController = TextEditingController();
+  final List<String> _buildings = [
+    '공학관',
+    '외국어대학관',
+    '체육대학관',
+    '멀티미디어교육관',
+    '생명과학대학관',
+    '전자정보대학관',
+    '예술디자인대학관',
+    '국제학관',
+  ];
+
+  String _selectedBuilding = '공학관';
+
+  final TextEditingController _roomNumberController = TextEditingController();
 
   final List<Color> _colors = [
     Colors.blue,
@@ -805,14 +818,14 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
     _startTimeController.addListener(() => setState(() {}));
     _endTimeController.addListener(() => setState(() {}));
-    _roomController.addListener(() => setState(() {}));
+    _roomNumberController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _startTimeController.dispose();
     _endTimeController.dispose();
-    _roomController.dispose();
+    _roomNumberController.dispose();
     super.dispose();
   }
 
@@ -835,7 +848,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     final endMinute = _parseTimeToMinute(_endTimeController.text);
 
     return _selectedDays.isNotEmpty &&
-        _roomController.text.trim().isNotEmpty &&
+        _roomNumberController.text.trim().isNotEmpty &&
         startMinute != null &&
         endMinute != null &&
         startMinute < endMinute;
@@ -855,7 +868,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
         day: day,
         startMinute: startMinute,
         endMinute: endMinute,
-        room: _roomController.text.trim(),
+        room: '$_selectedBuilding ${_roomNumberController.text.trim()}',
         color: color,
       );
     }).toList();
@@ -866,7 +879,8 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
       _selectedDays.clear();
       _startTimeController.text = '09:00';
       _endTimeController.text = '10:00';
-      _roomController.clear();
+      _roomNumberController.clear();
+      _selectedBuilding = '공학관';
     });
   }
 
@@ -1102,10 +1116,72 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
                           _buildLabel('강의실'),
                           const SizedBox(height: 8),
-                          _buildTextField(
-                            controller: _roomController,
-                            hintText: '예: 공학관 301',
-                            keyboardType: TextInputType.text,
+
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: DropdownButtonFormField<String>(
+                                  value: _selectedBuilding,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 14,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFD1D5DB),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFD1D5DB),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF2563EB),
+                                        width: 1.7,
+                                      ),
+                                    ),
+                                  ),
+                                  items: _buildings.map((building) {
+                                    return DropdownMenuItem<String>(
+                                      value: building,
+                                      child: Text(
+                                        building,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    if (value == null) return;
+
+                                    setState(() {
+                                      _selectedBuilding = value;
+                                    });
+                                  },
+                                ),
+                              ),
+
+                              const SizedBox(width: 10),
+
+                              Expanded(
+                                flex: 2,
+                                child: _buildTextField(
+                                  controller: _roomNumberController,
+                                  hintText: '예: 101',
+                                  keyboardType: TextInputType.text,
+                                ),
+                              ),
+                            ],
                           ),
 
                           const SizedBox(height: 22),
