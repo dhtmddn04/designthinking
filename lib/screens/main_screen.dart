@@ -27,7 +27,7 @@ class _MainScreenState extends State<MainScreen> {
         userId: currentUserId,
         needsWheelchair: currentNeedsWheelchair,
       ),
-      const OpinionScreen(),
+      OpinionScreen(key: ValueKey(currentUserId), userId: currentUserId),
       ProfileScreen(
         userId: currentUserId,
         onLoginSuccess: (user) {

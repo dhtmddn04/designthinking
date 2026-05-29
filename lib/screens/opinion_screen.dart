@@ -14,7 +14,9 @@ const Duration _cooldown = Duration(hours: 1);
 //  StatefulWidget
 // ──────────────────────────────────────────────
 class OpinionScreen extends StatefulWidget {
-  const OpinionScreen({super.key});
+  final int? userId;
+
+  const OpinionScreen({super.key, required this.userId});
 
   @override
   State<OpinionScreen> createState() => _OpinionScreenState();
@@ -39,7 +41,15 @@ class _OpinionScreenState extends State<OpinionScreen>
   };
 
   // ── 마지막 제보 시각 ─────────────────────────
-  DateTime? _lastReportedAt;
+  // ── 사용자별 마지막 제보 시각 ─────────────────
+  static final Map<int, DateTime> _lastReportedAtByUser = {};
+
+  DateTime? get _lastReportedAt {
+    final userId = widget.userId;
+    if (userId == null) return null;
+
+    return _lastReportedAtByUser[userId];
+  }
 
   // ── 1초 타이머 (쿨다운 카운트다운) ───────────
   Timer? _ticker;
@@ -98,6 +108,19 @@ class _OpinionScreenState extends State<OpinionScreen>
 
   // ── 제보 처리 ────────────────────────────────
   Future<void> _submitReport() async {
+    if (widget.userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('로그인이 필요합니다.'),
+          backgroundColor: const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
     if (_selectedLocation == null || _selectedCongestion == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -121,16 +144,16 @@ class _OpinionScreenState extends State<OpinionScreen>
 
     try {
       final result = await ApiService.submitOpinion(
+        userId: widget.userId!,
         stopName: _selectedLocation!,
         congestionLevel: _selectedCongestion!,
         comment: null,
       );
-
       if (!mounted) return;
 
       if (result['success'] == true) {
         setState(() {
-          _lastReportedAt = DateTime.now();
+          _lastReportedAtByUser[widget.userId!] = DateTime.now();
         });
 
         final tabIndex = _tabLabels.indexOf(_selectedLocation!);

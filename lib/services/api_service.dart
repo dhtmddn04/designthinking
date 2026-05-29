@@ -95,6 +95,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> submitOpinion({
+    required int userId,
     required String stopName,
     required String congestionLevel,
     String? comment,
@@ -103,6 +104,7 @@ class ApiService {
       Uri.parse('$baseUrl/opinions'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
+        'userId': userId,
         'stopName': stopName,
         'congestionLevel': congestionLevel,
         'comment': comment,
