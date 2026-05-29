@@ -237,6 +237,61 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
+  void _showReservationDialog(String time) {
+    final stop = selectedStop ?? '';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            '예약되었습니다',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            '$stop 정류장 $time 예약이 완료되었습니다.',
+            style: const TextStyle(fontSize: 14, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text(
+                '닫기',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  if (selectedStop != null) {
+                    reservedTimesByStop.remove(selectedStop);
+                  }
+                });
+
+                Navigator.pop(context);
+              },
+              child: const Text(
+                '예약 취소',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _ticketInfoBox({required String label, required String value}) {
     return Container(
       width: double.infinity,
@@ -312,7 +367,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final time = times[index];
-              final bool isReserved = reservedTimesByStop[selectedStop] == time;
+              final String? reservedTime = reservedTimesByStop[selectedStop];
+              final bool isReserved = reservedTime == time;
+              final bool hasReservation = reservedTime != null;
+              final bool isDisabled = hasReservation && !isReserved;
 
               return Container(
                 height: 56,
@@ -341,18 +399,31 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         child: SizedBox(
                           height: 34,
                           child: ElevatedButton(
-                            onPressed: () {
-                              if (selectedStop == null) return;
+                            onPressed: isDisabled
+                                ? null
+                                : () {
+                                    if (selectedStop == null) return;
 
-                              setState(() {
-                                reservedTimesByStop[selectedStop!] = time;
-                              });
-                            },
+                                    if (isReserved) {
+                                      _showReservationDialog(time);
+                                      return;
+                                    }
+
+                                    setState(() {
+                                      reservedTimesByStop[selectedStop!] = time;
+                                    });
+                                  },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isReserved
                                   ? const Color(0xFF00C950)
+                                  : isDisabled
+                                  ? const Color(0xFFE5E7EB)
                                   : const Color(0xFF2B7FFF),
-                              foregroundColor: Colors.white,
+                              foregroundColor: isReserved || !isDisabled
+                                  ? Colors.white
+                                  : const Color(0xFF9CA3AF),
+                              disabledBackgroundColor: const Color(0xFFE5E7EB),
+                              disabledForegroundColor: const Color(0xFF9CA3AF),
                               elevation: 0,
                               padding: EdgeInsets.zero,
                               shape: RoundedRectangleBorder(
@@ -360,7 +431,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
                               ),
                             ),
                             child: Text(
-                              isReserved ? '예약됨' : '예약하기',
+                              isReserved
+                                  ? '예약완료'
+                                  : isDisabled
+                                  ? '예약불가'
+                                  : '예약하기',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
