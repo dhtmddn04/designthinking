@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import '../services/api_service.dart';
 
 enum TransportMode { none, bus, walk }
 
@@ -13,6 +15,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String selectedStation = '정문';
 
   String? activeStation;
+  Timer? _congestionTimer;
 
   final Map<String, TransportMode> transportModeByStation = {
     '정문': TransportMode.none,
@@ -26,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
     '전정대': null,
   };
 
-  late Map<String, int> waitingCountByStation;
+  Map<String, int> waitingCountByStation = {};
 
   static const int busCapacity = 40;
 
@@ -71,6 +74,18 @@ class _HomeScreenState extends State<HomeScreen> {
       for (final station in stations)
         station: stationData[station]!['waiting'] as int,
     };
+
+    _loadCongestionSummaries();
+
+    _congestionTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadCongestionSummaries();
+    });
+  }
+
+  @override
+  void dispose() {
+    _congestionTimer?.cancel();
+    super.dispose();
   }
 
   Map<String, dynamic> get currentData => stationData[selectedStation]!;
@@ -96,6 +111,8 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       selectedStation = station;
     });
+
+    _loadCongestionSummaries();
   }
 
   void _startBusWaiting() {
@@ -185,6 +202,46 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return '$busOrder번째 버스';
+  }
+
+  Future<void> _loadCongestionSummaries() async {
+    try {
+      final result = await ApiService.getOpinionSummaries();
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final summaries = result['summaries'] as Map<String, dynamic>;
+
+        setState(() {
+          for (final station in stationData.keys) {
+            final summary = summaries[station];
+
+            if (summary == null) {
+              stationData[station]!['congestion'] = '-';
+              continue;
+            }
+
+            final int reportCount = summary['reportCount'] ?? 0;
+            final String congestionLevel =
+                summary['congestionLevel'] ?? '정보 없음';
+
+            stationData[station]!['congestion'] =
+                reportCount == 0 || congestionLevel == '정보 없음'
+                ? '-'
+                : congestionLevel;
+          }
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        for (final station in stationData.keys) {
+          stationData[station]!['congestion'] = '-';
+        }
+      });
+    }
   }
 
   @override

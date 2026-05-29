@@ -93,4 +93,28 @@ class ApiService {
 
     return jsonDecode(response.body);
   }
+
+  static Future<Map<String, dynamic>> submitOpinion({
+    required String stopName,
+    required String congestionLevel,
+    String? comment,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/opinions'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'stopName': stopName,
+        'congestionLevel': congestionLevel,
+        'comment': comment,
+      }),
+    );
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> getOpinionSummaries() async {
+    final response = await http.get(Uri.parse('$baseUrl/opinions/summary/all'));
+
+    return jsonDecode(response.body);
+  }
 }
