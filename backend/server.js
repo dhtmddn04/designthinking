@@ -1,3 +1,4 @@
+const db = require('./db');
 const express = require('express');
 const cors = require('cors');
 
@@ -11,6 +12,25 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     message: 'Backend connected',
   });
+});
+
+app.get('/api/db-test', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT 1 + 1 AS result');
+
+    res.json({
+      status: 'ok',
+      message: 'MySQL connected',
+      result: rows[0].result,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      status: 'error',
+      message: 'MySQL connection failed',
+    });
+  }
 });
 
 app.get('/api/home/stations', (req, res) => {
