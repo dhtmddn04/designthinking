@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class ReservationScreen extends StatefulWidget {
-  const ReservationScreen({super.key});
+  final int? userId;
+  final bool needsWheelchair;
+
+  const ReservationScreen({
+    super.key,
+    required this.userId,
+    required this.needsWheelchair,
+  });
 
   @override
   State<ReservationScreen> createState() => _ReservationScreenState();
@@ -9,7 +17,53 @@ class ReservationScreen extends StatefulWidget {
 
 class _ReservationScreenState extends State<ReservationScreen> {
   String? selectedStop;
-  final Map<String, String> reservedTimesByStop = {};
+
+  final Map<String, String> myReservedTimesByStop = {};
+  final Map<String, Set<String>> occupiedTimesByStop = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReservations();
+  }
+
+  Future<void> _loadReservations() async {
+    try {
+      final result = await ApiService.getAllReservations();
+
+      if (!context.mounted) return;
+
+      if (result['success'] == true) {
+        final reservations = result['reservations'] as List<dynamic>;
+
+        setState(() {
+          myReservedTimesByStop.clear();
+          occupiedTimesByStop.clear();
+
+          for (final reservation in reservations) {
+            final stopName = reservation['stop_name'];
+            final reservedTime = reservation['reserved_time'];
+            final reservationUserId = reservation['user_id'];
+
+            if (stopName == null || reservedTime == null) continue;
+
+            occupiedTimesByStop.putIfAbsent(stopName, () => <String>{});
+            occupiedTimesByStop[stopName]!.add(reservedTime);
+
+            if (widget.userId != null && reservationUserId == widget.userId) {
+              myReservedTimesByStop[stopName] = reservedTime;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('예약 내역을 불러올 수 없습니다.')));
+    }
+  }
 
   final List<String> stops = ['정문', '외대', '전정대'];
 
@@ -128,6 +182,105 @@ class _ReservationScreenState extends State<ReservationScreen> {
         ),
       ),
     );
+  }
+
+  void _showNotAllowedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            '예약 불가',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          content: const Text('예약 기능 이용 대상자가 아닙니다.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _reserveTime(String time) async {
+    if (widget.userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      return;
+    }
+
+    if (!widget.needsWheelchair) {
+      _showNotAllowedDialog();
+      return;
+    }
+
+    if (selectedStop == null) return;
+
+    try {
+      final result = await ApiService.createReservation(
+        userId: widget.userId!,
+        stopName: selectedStop!,
+        busNumber: '1112',
+        reservedTime: time,
+      );
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['message'] ?? '예약 결과를 확인할 수 없습니다.')),
+      );
+
+      if (result['success'] == true) {
+        await _loadReservations();
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+    }
+  }
+
+  Future<void> _cancelReservation(String time) async {
+    if (widget.userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      return;
+    }
+
+    if (selectedStop == null) return;
+
+    try {
+      final result = await ApiService.cancelReservation(
+        userId: widget.userId!,
+        stopName: selectedStop!,
+        reservedTime: time,
+      );
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['message'] ?? '예약 취소 결과를 확인할 수 없습니다.')),
+      );
+
+      if (result['success'] == true) {
+        await _loadReservations();
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+    }
   }
 
   void _showTicketBottomSheet(String time) {
@@ -270,13 +423,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
             ),
             TextButton(
               onPressed: () {
-                setState(() {
-                  if (selectedStop != null) {
-                    reservedTimesByStop.remove(selectedStop);
-                  }
-                });
-
                 Navigator.pop(context);
+                _cancelReservation(time);
               },
               child: const Text(
                 '예약 취소',
@@ -367,10 +515,20 @@ class _ReservationScreenState extends State<ReservationScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final time = times[index];
-              final String? reservedTime = reservedTimesByStop[selectedStop];
-              final bool isReserved = reservedTime == time;
-              final bool hasReservation = reservedTime != null;
-              final bool isDisabled = hasReservation && !isReserved;
+              final String? myReservedTime =
+                  myReservedTimesByStop[selectedStop];
+
+              final bool isMyReservation = myReservedTime == time;
+              final bool hasMyReservationAtStop = myReservedTime != null;
+
+              final bool isOccupied =
+                  occupiedTimesByStop[selectedStop]?.contains(time) ?? false;
+
+              final bool isReservedByOther = isOccupied && !isMyReservation;
+
+              final bool isDisabled =
+                  isReservedByOther ||
+                  (hasMyReservationAtStop && !isMyReservation);
 
               return Container(
                 height: 56,
@@ -404,22 +562,20 @@ class _ReservationScreenState extends State<ReservationScreen> {
                                 : () {
                                     if (selectedStop == null) return;
 
-                                    if (isReserved) {
+                                    if (isMyReservation) {
                                       _showReservationDialog(time);
                                       return;
                                     }
 
-                                    setState(() {
-                                      reservedTimesByStop[selectedStop!] = time;
-                                    });
+                                    _reserveTime(time);
                                   },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isReserved
+                              backgroundColor: isMyReservation
                                   ? const Color(0xFF00C950)
                                   : isDisabled
                                   ? const Color(0xFFE5E7EB)
                                   : const Color(0xFF2B7FFF),
-                              foregroundColor: isReserved || !isDisabled
+                              foregroundColor: isMyReservation || !isDisabled
                                   ? Colors.white
                                   : const Color(0xFF9CA3AF),
                               disabledBackgroundColor: const Color(0xFFE5E7EB),
@@ -431,7 +587,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                               ),
                             ),
                             child: Text(
-                              isReserved
+                              isMyReservation
                                   ? '예약완료'
                                   : isDisabled
                                   ? '예약불가'
@@ -452,16 +608,16 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         child: SizedBox(
                           height: 34,
                           child: ElevatedButton(
-                            onPressed: isReserved
+                            onPressed: isMyReservation
                                 ? () {
                                     _showTicketBottomSheet(time);
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isReserved
+                              backgroundColor: isMyReservation
                                   ? const Color(0xFFAD46FF)
                                   : const Color(0xFFE5E7EB),
-                              foregroundColor: isReserved
+                              foregroundColor: isMyReservation
                                   ? Colors.white
                                   : const Color(0xFF9CA3AF),
                               disabledBackgroundColor: const Color(0xFFE5E7EB),

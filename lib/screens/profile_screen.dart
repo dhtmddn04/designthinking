@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 // ─────────────────────────────────────────────
 // 데이터 모델
@@ -77,7 +78,14 @@ final List<TimetableEntry> initialTimetable = [
 // ─────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final void Function(Map<String, dynamic> user) onLoginSuccess;
+  final VoidCallback onLogoutSuccess;
+
+  const ProfileScreen({
+    super.key,
+    required this.onLoginSuccess,
+    required this.onLogoutSuccess,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -102,6 +110,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loggedInUser = '';
       _showSignup = false;
     });
+
+    widget.onLogoutSuccess();
   }
 
   void _updateTimetable(List<TimetableEntry> updatedTimetable) {
@@ -125,6 +135,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!_isLoggedIn) {
       return LoginView(
         onLogin: _login,
+        onLoginSuccess: widget.onLoginSuccess,
         onSignup: () {
           setState(() {
             _showSignup = true;
@@ -148,11 +159,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 class LoginView extends StatefulWidget {
   final void Function(String username) onLogin;
+  final void Function(Map<String, dynamic> user) onLoginSuccess;
   final VoidCallback onSignup;
 
   const LoginView({
     super.key,
     required this.onLogin,
+    required this.onLoginSuccess,
     required this.onSignup,
   });
 
@@ -189,10 +202,7 @@ class _LoginViewState extends State<LoginView> {
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [
-                        Color(0xFF3B82F6),
-                        Color(0xFF2563EB),
-                      ],
+                      colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -222,10 +232,7 @@ class _LoginViewState extends State<LoginView> {
                 const SizedBox(height: 5),
                 const Text(
                   '계정에 로그인하세요',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B7280),
-                  ),
+                  style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
                 ),
                 const SizedBox(height: 34),
 
@@ -274,10 +281,10 @@ class _LoginViewState extends State<LoginView> {
                         ),
                         child: _autoLogin
                             ? const Icon(
-                          Icons.check,
-                          color: Colors.white,
-                          size: 13,
-                        )
+                                Icons.check,
+                                color: Colors.white,
+                                size: 13,
+                              )
                             : null,
                       ),
                     ),
@@ -303,8 +310,46 @@ class _LoginViewState extends State<LoginView> {
 
                 _buildPrimaryButton(
                   label: '로그인',
-                  onTap: () {
-                    widget.onLogin(_usernameController.text.trim());
+                  onTap: () async {
+                    final username = _usernameController.text.trim();
+                    final password = _passwordController.text.trim();
+
+                    if (username.isEmpty || password.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('아이디와 비밀번호를 입력해주세요.')),
+                      );
+                      return;
+                    }
+
+                    try {
+                      final result = await ApiService.login(
+                        username: username,
+                        password: password,
+                      );
+
+                      if (!context.mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result['message'] ?? '로그인 결과를 확인할 수 없습니다.',
+                          ),
+                        ),
+                      );
+
+                      if (result['success'] == true) {
+                        final user = result['user'];
+
+                        widget.onLogin(user['username']);
+                        widget.onLoginSuccess(user);
+                      }
+                    } catch (e) {
+                      if (!context.mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
+                      );
+                    }
                   },
                 ),
 
@@ -314,10 +359,7 @@ class _LoginViewState extends State<LoginView> {
                   onPressed: widget.onSignup,
                   child: const Text(
                     '회원가입',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF4B5563),
-                    ),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
                   ),
                 ),
               ],
@@ -336,10 +378,7 @@ class _LoginViewState extends State<LoginView> {
 class SignupView extends StatefulWidget {
   final VoidCallback onBackToLogin;
 
-  const SignupView({
-    super.key,
-    required this.onBackToLogin,
-  });
+  const SignupView({super.key, required this.onBackToLogin});
 
   @override
   State<SignupView> createState() => _SignupViewState();
@@ -349,7 +388,7 @@ class _SignupViewState extends State<SignupView> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordConfirmController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
   bool _needsWheelchair = true;
@@ -384,10 +423,7 @@ class _SignupViewState extends State<SignupView> {
               const SizedBox(height: 5),
               const Text(
                 '새 계정을 만들어보세요',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6B7280),
-                ),
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
               ),
               const SizedBox(height: 30),
 
@@ -465,8 +501,57 @@ class _SignupViewState extends State<SignupView> {
 
               _buildPrimaryButton(
                 label: '가입하기',
-                onTap: () {
-                  widget.onBackToLogin();
+                onTap: () async {
+                  final username = _usernameController.text.trim();
+                  final password = _passwordController.text.trim();
+                  final passwordConfirm = _passwordConfirmController.text
+                      .trim();
+                  final phone = _phoneController.text.trim();
+
+                  if (username.isEmpty ||
+                      password.isEmpty ||
+                      passwordConfirm.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('아이디와 비밀번호를 입력해주세요.')),
+                    );
+                    return;
+                  }
+
+                  if (password != passwordConfirm) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('비밀번호가 일치하지 않습니다.')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    final result = await ApiService.signup(
+                      username: username,
+                      password: password,
+                      phone: phone,
+                      needsWheelchair: _needsWheelchair,
+                    );
+
+                    if (!context.mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result['message'] ?? '회원가입 결과를 확인할 수 없습니다.',
+                        ),
+                      ),
+                    );
+
+                    if (result['success'] == true) {
+                      widget.onBackToLogin();
+                    }
+                  } catch (e) {
+                    if (!context.mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
+                    );
+                  }
                 },
               ),
 
@@ -477,10 +562,7 @@ class _SignupViewState extends State<SignupView> {
                   onPressed: widget.onBackToLogin,
                   child: const Text(
                     '이미 계정이 있으신가요? 로그인',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF4B5563),
-                    ),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
                   ),
                 ),
               ),
@@ -528,10 +610,7 @@ class ProfileContentView extends StatelessWidget {
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
-                        colors: [
-                          Color(0xFF3B82F6),
-                          Color(0xFF2563EB),
-                        ],
+                        colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -700,10 +779,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   final List<String> _days = ['월', '화', '수', '목', '금'];
   final List<String> _selectedDays = [];
 
-  final TextEditingController _startTimeController =
-  TextEditingController(text: '09:00');
-  final TextEditingController _endTimeController =
-  TextEditingController(text: '10:00');
+  final TextEditingController _startTimeController = TextEditingController(
+    text: '09:00',
+  );
+  final TextEditingController _endTimeController = TextEditingController(
+    text: '10:00',
+  );
   final TextEditingController _roomController = TextEditingController();
 
   final List<Color> _colors = [
@@ -780,10 +861,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     }).toList();
 
     setState(() {
-      _timetable = [
-        ..._timetable,
-        ...newEntries,
-      ];
+      _timetable = [..._timetable, ...newEntries];
 
       _selectedDays.clear();
       _startTimeController.text = '09:00';
@@ -820,17 +898,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
           ),
           title: const Text(
             '수업 삭제',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w900),
           ),
           content: Text(
             '${entry.day}요일 ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}\n'
-                '${entry.room} 수업을 삭제할까요?',
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-            ),
+            '${entry.room} 수업을 삭제할까요?',
+            style: const TextStyle(fontSize: 14, height: 1.5),
           ),
           actions: [
             TextButton(
@@ -945,8 +1018,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
                           Row(
                             children: _days.map((day) {
-                              final bool selected =
-                              _selectedDays.contains(day);
+                              final bool selected = _selectedDays.contains(day);
 
                               return Expanded(
                                 child: GestureDetector(
@@ -1044,11 +1116,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                               onPressed: _canAddClass ? _addClass : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2563EB),
-                                disabledBackgroundColor:
-                                const Color(0xFFE5E7EB),
+                                disabledBackgroundColor: const Color(
+                                  0xFFE5E7EB,
+                                ),
                                 foregroundColor: Colors.white,
-                                disabledForegroundColor:
-                                const Color(0xFF9CA3AF),
+                                disabledForegroundColor: const Color(
+                                  0xFF9CA3AF,
+                                ),
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
@@ -1110,7 +1184,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           '${entry.day}요일 ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}',
@@ -1196,10 +1270,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     );
   }
 
-  Widget _sectionCard({
-    required String title,
-    required Widget child,
-  }) {
+  Widget _sectionCard({required String title, required Widget child}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -1240,10 +1311,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 class TimetableGrid extends StatelessWidget {
   final List<TimetableEntry> timetable;
 
-  const TimetableGrid({
-    super.key,
-    required this.timetable,
-  });
+  const TimetableGrid({super.key, required this.timetable});
 
   static const List<String> _days = ['월', '화', '수', '목', '금'];
   static const List<int> _hours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
@@ -1348,68 +1416,68 @@ class TimetableGrid extends StatelessWidget {
                   final int dayIndex = dayEntry.key;
                   final String day = dayEntry.value;
 
-                  return timetable.where((entry) => entry.day == day).map(
-                        (entry) {
-                      final int timetableStartMinute = _hours.first * 60;
-                      final int timetableEndMinute = (_hours.last + 1) * 60;
+                  return timetable.where((entry) => entry.day == day).map((
+                    entry,
+                  ) {
+                    final int timetableStartMinute = _hours.first * 60;
+                    final int timetableEndMinute = (_hours.last + 1) * 60;
 
-                      if (entry.endMinute <= timetableStartMinute ||
-                          entry.startMinute >= timetableEndMinute) {
-                        return const SizedBox.shrink();
-                      }
+                    if (entry.endMinute <= timetableStartMinute ||
+                        entry.startMinute >= timetableEndMinute) {
+                      return const SizedBox.shrink();
+                    }
 
-                      final int visibleStart =
-                      entry.startMinute < timetableStartMinute
-                          ? timetableStartMinute
-                          : entry.startMinute;
+                    final int visibleStart =
+                        entry.startMinute < timetableStartMinute
+                        ? timetableStartMinute
+                        : entry.startMinute;
 
-                      final int visibleEnd = entry.endMinute > timetableEndMinute
-                          ? timetableEndMinute
-                          : entry.endMinute;
+                    final int visibleEnd = entry.endMinute > timetableEndMinute
+                        ? timetableEndMinute
+                        : entry.endMinute;
 
-                      final double top =
-                          ((visibleStart - timetableStartMinute) / 60) *
-                              (_rowHeight + _gap);
+                    final double top =
+                        ((visibleStart - timetableStartMinute) / 60) *
+                        (_rowHeight + _gap);
 
-                      final double left = _timeColumnWidth +
-                          dayIndex * (_dayColumnWidth + _gap);
+                    final double left =
+                        _timeColumnWidth + dayIndex * (_dayColumnWidth + _gap);
 
-                      final double height =
-                          ((visibleEnd - visibleStart) / 60) *
-                              (_rowHeight + _gap) -
-                              _gap;
+                    final double height =
+                        ((visibleEnd - visibleStart) / 60) *
+                            (_rowHeight + _gap) -
+                        _gap;
 
-                      return Positioned(
-                        top: top,
-                        left: left,
-                        width: _dayColumnWidth,
-                        height: height < 20 ? 20 : height,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: _gap / 2,
-                          ),
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: entry.color,
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Center(
-                            child: Text(
-                              entry.room,
-                              textAlign: TextAlign.center,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 7,
-                                fontWeight: FontWeight.w800,
-                              ),
+                    return Positioned(
+                      top: top,
+                      left: left,
+                      width: _dayColumnWidth,
+                      height: height < 20 ? 20 : height,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: _gap / 2,
+                        ),
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: entry.color,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Center(
+                          child: Text(
+                            entry.room,
+                            textAlign: TextAlign.center,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 7,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
-                      );
-                    },
-                  );
+                      ),
+                    );
+                  });
                 }),
               ],
             ),
@@ -1451,16 +1519,10 @@ Widget _buildTextField({
     style: const TextStyle(fontSize: 14),
     decoration: InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xFF9CA3AF),
-        fontSize: 13,
-      ),
+      hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 15,
-        vertical: 14,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
@@ -1471,10 +1533,7 @@ Widget _buildTextField({
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Color(0xFF2563EB),
-          width: 1.7,
-        ),
+        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.7),
       ),
     ),
   );
@@ -1494,16 +1553,11 @@ Widget _buildPrimaryButton({
         elevation: 5,
         shadowColor: const Color(0x332563EB),
         padding: const EdgeInsets.symmetric(vertical: 15),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w900,
-        ),
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
       ),
     ),
   );

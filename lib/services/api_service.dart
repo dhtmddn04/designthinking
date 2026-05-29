@@ -1,0 +1,96 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class ApiService {
+  // Android Emulator에서 PC의 localhost로 접근할 때는 10.0.2.2 사용
+  static const String baseUrl = 'http://10.0.2.2:3000/api';
+
+  static Future<Map<String, dynamic>> signup({
+    required String username,
+    required String password,
+    required String phone,
+    required bool needsWheelchair,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/signup'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'username': username,
+        'password': password,
+        'phone': phone,
+        'needsWheelchair': needsWheelchair,
+      }),
+    );
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> login({
+    required String username,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'username': username, 'password': password}),
+    );
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> createReservation({
+    required int userId,
+    required String stopName,
+    required String busNumber,
+    required String reservedTime,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/reservations'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'userId': userId,
+        'stopName': stopName,
+        'busNumber': busNumber,
+        'reservedTime': reservedTime,
+      }),
+    );
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> cancelReservation({
+    required int userId,
+    required String stopName,
+    required String reservedTime,
+  }) async {
+    final request = http.Request('DELETE', Uri.parse('$baseUrl/reservations'));
+
+    request.headers['Content-Type'] = 'application/json';
+    request.body = jsonEncode({
+      'userId': userId,
+      'stopName': stopName,
+      'reservedTime': reservedTime,
+    });
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> getUserReservations({
+    required int userId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/reservations/user/$userId'),
+    );
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> getAllReservations() async {
+    final response = await http.get(Uri.parse('$baseUrl/reservations'));
+
+    return jsonDecode(response.body);
+  }
+}
