@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 // ─────────────────────────────────────────────
 
 class TimetableEntry {
+  final int? id;
   final String day;
   final int startMinute;
   final int endMinute;
@@ -13,6 +14,7 @@ class TimetableEntry {
   final Color color;
 
   TimetableEntry({
+    this.id,
     required this.day,
     required this.startMinute,
     required this.endMinute,
@@ -78,11 +80,13 @@ final List<TimetableEntry> initialTimetable = [
 // ─────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
+  final int? userId;
   final void Function(Map<String, dynamic> user) onLoginSuccess;
   final VoidCallback onLogoutSuccess;
 
   const ProfileScreen({
     super.key,
+    required this.userId,
     required this.onLoginSuccess,
     required this.onLogoutSuccess,
   });
@@ -95,7 +99,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoggedIn = false;
   bool _showSignup = false;
   String _loggedInUser = '';
-  List<TimetableEntry> _timetable = List.from(initialTimetable);
+  //List<TimetableEntry> _timetable = List.from(initialTimetable);
+  List<TimetableEntry> _timetable = [];
 
   void _login(String username) {
     setState(() {
@@ -109,6 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _isLoggedIn = false;
       _loggedInUser = '';
       _showSignup = false;
+      _timetable = [];
     });
 
     widget.onLogoutSuccess();
@@ -118,6 +124,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _timetable = updatedTimetable;
     });
+  }
+
+  int? _parseTimeToMinute(String? text) {
+    if (text == null) return null;
+
+    final parts = text.trim().split(':');
+    if (parts.length != 2) return null;
+
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+
+    if (hour == null || minute == null) return null;
+
+    return hour * 60 + minute;
+  }
+
+  Future<void> _loadTimetable(int userId) async {
+    try {
+      final result = await ApiService.getSchedules(userId: userId);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final schedules = result['schedules'] as List<dynamic>;
+
+        final colors = [
+          Colors.blue,
+          Colors.green,
+          Colors.purple,
+          Colors.orange,
+          Colors.pink,
+          Colors.red,
+        ];
+
+        setState(() {
+          _timetable = schedules.asMap().entries.map((entry) {
+            final index = entry.key;
+            final schedule = entry.value;
+
+            final startMinute = _parseTimeToMinute(schedule['startTime']) ?? 0;
+            final endMinute = _parseTimeToMinute(schedule['endTime']) ?? 0;
+
+            final buildingName = schedule['buildingName'] ?? '';
+            final roomNumber = schedule['roomNumber'] ?? '';
+
+            return TimetableEntry(
+              id: schedule['id'],
+              day: schedule['dayOfWeek'],
+              startMinute: startMinute,
+              endMinute: endMinute,
+              room: '$buildingName $roomNumber',
+              color: colors[index % colors.length],
+            );
+          }).toList();
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('시간표를 불러올 수 없습니다.')));
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.userId != widget.userId && widget.userId != null) {
+      _loadTimetable(widget.userId!);
+    }
   }
 
   @override
@@ -145,6 +223,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return ProfileContentView(
+      userId: widget.userId,
       username: _loggedInUser,
       timetable: _timetable,
       onLogout: _logout,
@@ -579,6 +658,7 @@ class _SignupViewState extends State<SignupView> {
 // ─────────────────────────────────────────────
 
 class ProfileContentView extends StatelessWidget {
+  final int? userId;
   final String username;
   final List<TimetableEntry> timetable;
   final VoidCallback onLogout;
@@ -586,6 +666,7 @@ class ProfileContentView extends StatelessWidget {
 
   const ProfileContentView({
     super.key,
+    required this.userId,
     required this.username,
     required this.timetable,
     required this.onLogout,
@@ -693,6 +774,7 @@ class ProfileContentView extends StatelessWidget {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => TimetableEditScreen(
+                                        userId: userId,
                                         timetable: timetable,
                                         onSave: onTimetableUpdated,
                                       ),
@@ -760,11 +842,13 @@ class ProfileContentView extends StatelessWidget {
 // ─────────────────────────────────────────────
 
 class TimetableEditScreen extends StatefulWidget {
+  final int? userId;
   final List<TimetableEntry> timetable;
   final void Function(List<TimetableEntry>) onSave;
 
   const TimetableEditScreen({
     super.key,
+    required this.userId,
     required this.timetable,
     required this.onSave,
   });
@@ -854,34 +938,100 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
         startMinute < endMinute;
   }
 
-  void _addClass() {
+  Future<void> _loadSchedulesFromServer() async {
+    final userId = widget.userId;
+
+    if (userId == null) return;
+
+    final result = await ApiService.getSchedules(userId: userId);
+
+    if (result['success'] != true) return;
+
+    final schedules = result['schedules'] as List<dynamic>;
+
+    setState(() {
+      _timetable = schedules.asMap().entries.map((entry) {
+        final index = entry.key;
+        final schedule = entry.value;
+
+        final startMinute = _parseTimeToMinute(schedule['startTime']) ?? 0;
+        final endMinute = _parseTimeToMinute(schedule['endTime']) ?? 0;
+
+        final buildingName = schedule['buildingName'] ?? '';
+        final roomNumber = schedule['roomNumber'] ?? '';
+
+        return TimetableEntry(
+          id: schedule['id'],
+          day: schedule['dayOfWeek'],
+          startMinute: startMinute,
+          endMinute: endMinute,
+          room: '$buildingName $roomNumber',
+          color: _colors[index % _colors.length],
+        );
+      }).toList();
+    });
+
+    widget.onSave(_timetable);
+  }
+
+  Future<void> _addClass() async {
+    final userId = widget.userId;
+
+    if (userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      return;
+    }
+
     final startMinute = _parseTimeToMinute(_startTimeController.text);
     final endMinute = _parseTimeToMinute(_endTimeController.text);
 
     if (!_canAddClass || startMinute == null || endMinute == null) return;
 
-    final Color color = _colors[_colorIndex % _colors.length];
-    _colorIndex++;
+    try {
+      for (final day in _selectedDays) {
+        final result = await ApiService.addSchedule(
+          userId: userId,
+          dayOfWeek: day,
+          startTime: _startTimeController.text.trim(),
+          endTime: _endTimeController.text.trim(),
+          buildingName: _selectedBuilding,
+          roomNumber: _roomNumberController.text.trim(),
+        );
 
-    final List<TimetableEntry> newEntries = _selectedDays.map((day) {
-      return TimetableEntry(
-        day: day,
-        startMinute: startMinute,
-        endMinute: endMinute,
-        room: '$_selectedBuilding ${_roomNumberController.text.trim()}',
-        color: color,
-      );
-    }).toList();
+        if (result['success'] != true) {
+          if (!mounted) return;
 
-    setState(() {
-      _timetable = [..._timetable, ...newEntries];
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message'] ?? '시간표 추가에 실패했습니다.')),
+          );
+          return;
+        }
+      }
 
-      _selectedDays.clear();
-      _startTimeController.text = '09:00';
-      _endTimeController.text = '10:00';
-      _roomNumberController.clear();
-      _selectedBuilding = '공학관';
-    });
+      if (!mounted) return;
+
+      await _loadSchedulesFromServer();
+
+      setState(() {
+        _selectedDays.clear();
+        _startTimeController.text = '09:00';
+        _endTimeController.text = '10:00';
+        _roomNumberController.clear();
+        _selectedBuilding = '공학관';
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('시간표가 추가되었습니다.')));
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+    }
   }
 
   String _formatMinute(int minute) {
@@ -894,10 +1044,51 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     return '$hourText:$minuteText';
   }
 
-  void _deleteClass(int index) {
-    setState(() {
-      _timetable.removeAt(index);
-    });
+  Future<void> _deleteClass(int index) async {
+    final userId = widget.userId;
+
+    if (userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      return;
+    }
+
+    final entry = _timetable[index];
+
+    if (entry.id == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('삭제할 시간표 정보를 찾을 수 없습니다.')));
+      return;
+    }
+
+    try {
+      final result = await ApiService.deleteSchedule(
+        userId: userId,
+        scheduleId: entry.id!,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        await _loadSchedulesFromServer();
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('시간표가 삭제되었습니다.')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? '시간표 삭제에 실패했습니다.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+    }
   }
 
   void _confirmDeleteClass(int index) {
@@ -933,9 +1124,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
               ),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(context);
-                _deleteClass(index);
+                await _deleteClass(index);
               },
               child: const Text(
                 '삭제',

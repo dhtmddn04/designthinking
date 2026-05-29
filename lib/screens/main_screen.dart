@@ -29,6 +29,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
       const OpinionScreen(),
       ProfileScreen(
+        userId: currentUserId,
         onLoginSuccess: (user) {
           setState(() {
             currentUserId = user['id'];

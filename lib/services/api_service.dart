@@ -117,4 +117,56 @@ class ApiService {
 
     return jsonDecode(response.body);
   }
+
+  static Future<Map<String, dynamic>> getSchedules({
+    required int userId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/schedules/user/$userId'),
+    );
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> addSchedule({
+    required int userId,
+    required String dayOfWeek,
+    required String startTime,
+    required String endTime,
+    required String buildingName,
+    required String roomNumber,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/schedules'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'userId': userId,
+        'dayOfWeek': dayOfWeek,
+        'startTime': startTime,
+        'endTime': endTime,
+        'buildingName': buildingName,
+        'roomNumber': roomNumber,
+      }),
+    );
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteSchedule({
+    required int userId,
+    required int scheduleId,
+  }) async {
+    final request = http.Request(
+      'DELETE',
+      Uri.parse('$baseUrl/schedules/$scheduleId'),
+    );
+
+    request.headers['Content-Type'] = 'application/json';
+    request.body = jsonEncode({'userId': userId});
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    return jsonDecode(response.body);
+  }
 }
