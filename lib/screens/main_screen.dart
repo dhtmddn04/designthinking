@@ -21,7 +21,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> screens = [
-      const HomeScreen(),
+      HomeScreen(userId: currentUserId),
       ReservationScreen(
         key: ValueKey(currentUserId),
         userId: currentUserId,

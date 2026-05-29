@@ -5,7 +5,9 @@ import '../services/api_service.dart';
 enum TransportMode { none, bus, walk }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int? userId;
+
+  const HomeScreen({super.key, required this.userId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -16,6 +18,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String? activeStation;
   Timer? _congestionTimer;
+  Timer? _scheduleTimer;
+
+  List<Map<String, dynamic>> _schedules = [];
+  String _classTimeText = '-';
+  String _nextClassText = '-';
 
   final Map<String, TransportMode> transportModeByStation = {
     '정문': TransportMode.none,
@@ -76,15 +83,209 @@ class _HomeScreenState extends State<HomeScreen> {
     };
 
     _loadCongestionSummaries();
+    _loadSchedules();
 
     _congestionTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _loadCongestionSummaries();
     });
+
+    _scheduleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _updateNextClassText();
+    });
+  }
+
+  int? _parseTimeToMinute(String? text) {
+    if (text == null) return null;
+
+    final parts = text.trim().split(':');
+    if (parts.length != 2) return null;
+
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+
+    if (hour == null || minute == null) return null;
+
+    return hour * 60 + minute;
+  }
+
+  String _formatRemainTime(int minute) {
+    if (minute < 60) {
+      return '$minute분';
+    }
+
+    final hour = minute ~/ 60;
+    final remainingMinute = minute % 60;
+
+    if (remainingMinute == 0) {
+      return '$hour시간';
+    }
+
+    return '$hour시간 $remainingMinute분';
+  }
+
+  String _getTodayKorean(DateTime now) {
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return days[now.weekday % 7];
+  }
+
+  int _getDayIndex(String day) {
+    const days = ['월', '화', '수', '목', '금'];
+    return days.indexOf(day);
+  }
+
+  void _updateNextClassText() {
+    if (_schedules.isEmpty) {
+      setState(() {
+        _classTimeText = '-';
+        _nextClassText = '-';
+      });
+      return;
+    }
+
+    final now = DateTime.now();
+    // 테스트용 현재 시각: 화요일 08:17
+    //final now = DateTime(2026, 6, 2, 10, 17);
+    final today = _getTodayKorean(now);
+    final currentMinute = now.hour * 60 + now.minute;
+
+    Map<String, dynamic>? todayNextSchedule;
+    int? todayRemainMinute;
+
+    for (final schedule in _schedules) {
+      if (schedule['dayOfWeek'] != today) continue;
+
+      final startMinute = _parseTimeToMinute(schedule['startTime']);
+      if (startMinute == null) continue;
+
+      if (startMinute >= currentMinute) {
+        final remain = startMinute - currentMinute;
+
+        if (todayRemainMinute == null || remain < todayRemainMinute) {
+          todayRemainMinute = remain;
+          todayNextSchedule = schedule;
+        }
+      }
+    }
+
+    if (todayNextSchedule != null && todayRemainMinute != null) {
+      final buildingName = todayNextSchedule['buildingName'] ?? '';
+      final roomNumber = todayNextSchedule['roomNumber'] ?? '';
+      final startTime = todayNextSchedule['startTime'] ?? '';
+
+      setState(() {
+        _classTimeText = _formatRemainTime(todayRemainMinute!);
+        _nextClassText = '$buildingName $roomNumber · $startTime';
+      });
+      return;
+    }
+
+    final todayIndex = _getDayIndex(today);
+
+    if (todayIndex == -1) {
+      setState(() {
+        _classTimeText = '-';
+        _nextClassText = '-';
+      });
+      return;
+    }
+
+    Map<String, dynamic>? nextDayFirstSchedule;
+    int? minRemainUntilNextClass;
+
+    for (final schedule in _schedules) {
+      final scheduleDay = schedule['dayOfWeek'];
+      final scheduleDayIndex = _getDayIndex(scheduleDay);
+
+      if (scheduleDayIndex == -1) continue;
+
+      final startMinute = _parseTimeToMinute(schedule['startTime']);
+      if (startMinute == null) continue;
+
+      int dayDiff = scheduleDayIndex - todayIndex;
+      if (dayDiff <= 0) {
+        dayDiff += 5;
+      }
+
+      final remainMinute =
+          (24 * 60 - currentMinute) + ((dayDiff - 1) * 24 * 60) + startMinute;
+
+      if (minRemainUntilNextClass == null ||
+          remainMinute < minRemainUntilNextClass) {
+        minRemainUntilNextClass = remainMinute;
+        nextDayFirstSchedule = schedule;
+      }
+    }
+
+    if (nextDayFirstSchedule != null &&
+        minRemainUntilNextClass != null &&
+        minRemainUntilNextClass <= 60) {
+      final buildingName = nextDayFirstSchedule['buildingName'] ?? '';
+      final roomNumber = nextDayFirstSchedule['roomNumber'] ?? '';
+      final startTime = nextDayFirstSchedule['startTime'] ?? '';
+
+      setState(() {
+        _classTimeText = _formatRemainTime(minRemainUntilNextClass!);
+        _nextClassText = '$buildingName $roomNumber · $startTime';
+      });
+      return;
+    }
+
+    setState(() {
+      _classTimeText = '-';
+      _nextClassText = '-';
+    });
+  }
+
+  Future<void> _loadSchedules() async {
+    final userId = widget.userId;
+
+    if (userId == null) {
+      if (!mounted) return;
+
+      setState(() {
+        _schedules = [];
+        _classTimeText = '-';
+        _nextClassText = '-';
+      });
+      return;
+    }
+
+    try {
+      final result = await ApiService.getSchedules(userId: userId);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        setState(() {
+          _schedules = List<Map<String, dynamic>>.from(result['schedules']);
+        });
+
+        _updateNextClassText();
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _schedules = [];
+        _classTimeText = '-';
+        _nextClassText = '-';
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.userId != widget.userId) {
+      _loadSchedules();
+    }
   }
 
   @override
   void dispose() {
     _congestionTimer?.cancel();
+    _scheduleTimer?.cancel();
     super.dispose();
   }
 
@@ -337,7 +538,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
               const SizedBox(height: 12),
-
               Row(
                 children: [
                   Expanded(
@@ -346,7 +546,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       iconColor: const Color(0xFFFF8A00),
                       iconBgColor: const Color(0xFFFFF4E5),
                       label: '수업까지',
-                      value: data['classTime'] as String,
+                      value: _classTimeText,
                     ),
                   ),
                   const SizedBox(width: 8),
