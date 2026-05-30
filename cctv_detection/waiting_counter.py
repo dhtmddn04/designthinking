@@ -1,5 +1,6 @@
 from collections import deque
 from statistics import median
+import time
 
 import cv2
 import requests
@@ -13,8 +14,8 @@ model = YOLO("yolov8n.pt")
 # =========================
 # 서버 설정
 # =========================
-SERVER_URL = "http://localhost:3000/waiting-count"
-
+SERVER_URL = "http://localhost:3000/api/waiting-count"
+SEND_INTERVAL_SECONDS = 10
 
 def send_waiting_count(count):
     """검출된 정문 대기인원 수를 Node.js 서버로 전송한다."""
@@ -47,6 +48,7 @@ if not cap.isOpened():
 # 최근 검출 인원 저장: 숫자 흔들림 방지
 recent_counts = deque(maxlen=7)
 last_stable_count = -1
+last_sent_time = 0.0
 
 while True:
     ret, frame = cap.read()
@@ -136,12 +138,20 @@ while True:
     recent_counts.append(current_count)
     stable_count = int(median(recent_counts))
 
-    if stable_count != last_stable_count:
+    current_time = time.time()
+
+    should_send = (
+        stable_count != last_stable_count
+        or current_time - last_sent_time >= SEND_INTERVAL_SECONDS
+    )
+
+    if should_send:
         print(f"정문 현재 대기인원: {stable_count}명")
 
         send_waiting_count(stable_count)
 
         last_stable_count = stable_count
+        last_sent_time = current_time
 
     # =========================
     # 6. 화면 표시

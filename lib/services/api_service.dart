@@ -196,6 +196,18 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  static Future<Map<String, dynamic>> getWaitingCount({
+    required String stationName,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/waiting-count',
+    ).replace(queryParameters: {'station': stationName});
+
+    final response = await http.get(uri);
+
+    return jsonDecode(response.body);
+  }
+
   /*//테스트용(평일)
   static Future<Map<String, dynamic>> getNextBusTimetable({
     required String stationName,

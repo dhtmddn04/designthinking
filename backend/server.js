@@ -8,6 +8,7 @@ const reservationRoutes = require('./routes/reservation.routes');
 const opinionRoutes = require('./routes/opinion.routes');
 const scheduleRoutes = require('./routes/schedule.routes');
 const busRoutes = require('./routes/bus.routes');
+const waitingRoutes = require('./routes/waiting.routes');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use('/api/reservations', reservationRoutes);
 app.use('/api/opinions', opinionRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/bus', busRoutes);
+app.use('/api/waiting-count', waitingRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({

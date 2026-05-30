@@ -20,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _congestionTimer;
   Timer? _scheduleTimer;
   Timer? _busTimetableTimer;
+  Timer? _waitingCountTimer;
 
   List<Map<String, dynamic>> _schedules = [];
   String _classTimeText = '-';
@@ -88,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _loadCongestionSummaries();
     _loadSchedules();
+    _loadWaitingCount();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -106,6 +108,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _congestionTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _loadCongestionSummaries();
+    });
+    _waitingCountTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _loadWaitingCount();
     });
 
     _scheduleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
@@ -318,6 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _congestionTimer?.cancel();
     _scheduleTimer?.cancel();
     _busTimetableTimer?.cancel();
+    _waitingCountTimer?.cancel();
     super.dispose();
   }
 
@@ -325,11 +331,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool get hasCurrentBusInfo => currentData['hasBusInfo'] == true;
 
+  // 기존 코드
   bool get _isWeekend {
     final now = DateTime.now();
     return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
     //return false;
   }
+
+  /* 테스트용 코드(평일)
+  bool get _isWeekend {
+    return false;
+  } */
 
   TransportMode get transportMode =>
       transportModeByStation[selectedStation] ?? TransportMode.none;
@@ -399,10 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     setState(() {
-      final newNumber = waitingCount + 1;
-
-      waitingCountByStation[selectedStation] = newNumber;
-      myWaitingNumberByStation[selectedStation] = newNumber;
+      myWaitingNumberByStation[selectedStation] = waitingCount + 1;
       transportModeByStation[selectedStation] = TransportMode.bus;
       activeStation = selectedStation;
     });
@@ -413,9 +422,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       if (transportMode == TransportMode.bus && myWaitingNumber != null) {
-        waitingCountByStation[selectedStation] = waitingCount > 0
-            ? waitingCount - 1
-            : 0;
         myWaitingNumberByStation[selectedStation] = null;
       }
 
@@ -426,12 +432,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _cancelTransportMode() {
     setState(() {
-      if (transportMode == TransportMode.bus && myWaitingNumber != null) {
-        waitingCountByStation[selectedStation] = waitingCount > 0
-            ? waitingCount - 1
-            : 0;
-      }
-
       transportModeByStation[selectedStation] = TransportMode.none;
       myWaitingNumberByStation[selectedStation] = null;
       activeStation = null;
@@ -507,6 +507,25 @@ class _HomeScreenState extends State<HomeScreen> {
           stationData[station]!['congestion'] = '-';
         }
       });
+    }
+  }
+
+  Future<void> _loadWaitingCount() async {
+    try {
+      final result = await ApiService.getWaitingCount(stationName: '정문');
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final int count = result['count'] ?? 0;
+
+        setState(() {
+          waitingCountByStation['정문'] = count;
+          stationData['정문']!['waiting'] = count;
+        });
+      }
+    } catch (e) {
+      // CCTV 대기인원 조회 실패 시 기존 표시값 유지
     }
   }
 
