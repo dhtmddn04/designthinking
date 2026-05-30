@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../services/api_service.dart';
 
 // ──────────────────────────────────────────────
 //  상수 데이터
@@ -13,7 +14,9 @@ const Duration _cooldown = Duration(hours: 1);
 //  StatefulWidget
 // ──────────────────────────────────────────────
 class OpinionScreen extends StatefulWidget {
-  const OpinionScreen({super.key});
+  final int? userId;
+
+  const OpinionScreen({super.key, required this.userId});
 
   @override
   State<OpinionScreen> createState() => _OpinionScreenState();
@@ -24,10 +27,15 @@ class OpinionScreen extends StatefulWidget {
 // ──────────────────────────────────────────────
 class _OpinionScreenState extends State<OpinionScreen>
     with AutomaticKeepAliveClientMixin {
-
   // ── 드롭다운 선택 상태 (null = 미선택) ──────
   String? _selectedLocation;
   String? _selectedCongestion;
+
+  bool get _isWeekend {
+    final now = DateTime.now();
+    return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
+    //return false;
+  }
 
   // ── 탭 선택 상태 ─────────────────────────────
   int _selectedTab = 0;
@@ -39,15 +47,24 @@ class _OpinionScreenState extends State<OpinionScreen>
   };
 
   // ── 마지막 제보 시각 ─────────────────────────
-  DateTime? _lastReportedAt;
+  // ── 사용자별 마지막 제보 시각 ─────────────────
+  static final Map<int, DateTime> _lastReportedAtByUser = {};
+
+  DateTime? get _lastReportedAt {
+    final userId = widget.userId;
+    if (userId == null) return null;
+
+    return _lastReportedAtByUser[userId];
+  }
 
   // ── 1초 타이머 (쿨다운 카운트다운) ───────────
   Timer? _ticker;
+  Timer? _summaryTimer;
 
   // ── 테마 색상 ────────────────────────────────
-  static const Color _primary  = Color(0xFF3B82F6);
+  static const Color _primary = Color(0xFF3B82F6);
   static const Color _barColor = Color(0xFF3B82F6);
-  static const Color _barBg    = Color(0xFFE5E7EB);
+  static const Color _barBg = Color(0xFFE5E7EB);
   static const Color _textDark = Color(0xFF111827);
   static const Color _textGray = Color(0xFF6B7280);
 
@@ -58,14 +75,22 @@ class _OpinionScreenState extends State<OpinionScreen>
   @override
   void initState() {
     super.initState();
+
+    _loadOpinionSummaries();
+
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_canReport) setState(() {});
+    });
+
+    _summaryTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadOpinionSummaries();
     });
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _summaryTimer?.cancel();
     super.dispose();
   }
 
@@ -87,15 +112,54 @@ class _OpinionScreenState extends State<OpinionScreen>
     return '$s초';
   }
 
+  void _showWeekendReportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            '제보 불가',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: const Text('주말에는 혼잡도 제보를 이용할 수 없습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // ── 제보 처리 ────────────────────────────────
-  void _submitReport() {
+  Future<void> _submitReport() async {
+    if (widget.userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('로그인이 필요합니다.'),
+          backgroundColor: const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+    if (_isWeekend) {
+      _showWeekendReportDialog();
+      return;
+    }
     if (_selectedLocation == null || _selectedCongestion == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _selectedLocation == null
-                ? '제보 위치를 선택해 주세요.'
-                : '체감 혼잡도를 선택해 주세요.',
+            _selectedLocation == null ? '제보 위치를 선택해 주세요.' : '체감 혼잡도를 선택해 주세요.',
           ),
           backgroundColor: const Color(0xFFF59E0B),
           behavior: SnackBarBehavior.floating,
@@ -112,26 +176,97 @@ class _OpinionScreenState extends State<OpinionScreen>
       return;
     }
 
-    setState(() {
-      _counts[_selectedLocation!]![_selectedCongestion!] =
-          (_counts[_selectedLocation!]![_selectedCongestion!] ?? 0) + 1;
-      _lastReportedAt = DateTime.now();
-    });
+    try {
+      final result = await ApiService.submitOpinion(
+        userId: widget.userId!,
+        stopName: _selectedLocation!,
+        congestionLevel: _selectedCongestion!,
+        comment: null,
+      );
+      if (!mounted) return;
 
-    final tabIndex = _tabLabels.indexOf(_selectedLocation!);
-    if (tabIndex != -1) setState(() => _selectedTab = tabIndex);
+      if (result['success'] == true) {
+        setState(() {
+          _lastReportedAtByUser[widget.userId!] = DateTime.now();
+        });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '[$_selectedLocation] $_selectedCongestion 제보 완료! '
-          '1시간 후 다시 제보할 수 있어요.',
+        final tabIndex = _tabLabels.indexOf(_selectedLocation!);
+        if (tabIndex != -1) {
+          setState(() {
+            _selectedTab = tabIndex;
+          });
+        }
+
+        await _loadOpinionSummaries();
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '[$_selectedLocation] $_selectedCongestion 제보 완료!\n'
+              '1시간 후 다시 제보할 수 있어요.',
+            ),
+            backgroundColor: _primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? '제보 저장에 실패했습니다.'),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('서버에 연결할 수 없습니다.'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
-        backgroundColor: _primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+      );
+    }
+  }
+
+  Future<void> _loadOpinionSummaries() async {
+    try {
+      final result = await ApiService.getOpinionSummaries();
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final summaries = result['summaries'] as Map<String, dynamic>;
+
+        setState(() {
+          for (final location in _locations) {
+            final summary = summaries[location];
+            if (summary == null) continue;
+
+            final levelCounts = summary['levelCounts'] as Map<String, dynamic>;
+
+            for (final level in _congestionLevels) {
+              _counts[location]![level] = levelCounts[level] ?? 0;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      // 홈/의견 화면 진입 때마다 에러 팝업 뜨면 거슬리니까 일단 조용히 무시
+    }
   }
 
   // ── 쿨다운 다이얼로그 ────────────────────────
@@ -185,7 +320,10 @@ class _OpinionScreenState extends State<OpinionScreen>
   // ────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    super.build(context); // AutomaticKeepAliveClientMixin 필수
+    super.build(context);
+
+    final bool canSubmitNow = !_isWeekend && _canReport;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -282,21 +420,28 @@ class _OpinionScreenState extends State<OpinionScreen>
                   child: ElevatedButton.icon(
                     onPressed: _submitReport,
                     icon: Icon(
-                      _canReport ? Icons.play_arrow : Icons.lock_clock,
+                      _isWeekend
+                          ? Icons.block
+                          : _canReport
+                          ? Icons.play_arrow
+                          : Icons.lock_clock,
                       size: 20,
                     ),
                     label: Text(
-                      _canReport
+                      _isWeekend
+                          ? '제보 불가'
+                          : _canReport
                           ? '제보하기'
                           : '$_cooldownText 후 제보 가능합니다',
                       style: TextStyle(
-                        fontSize: _canReport ? 16 : 13,
+                        fontSize: canSubmitNow ? 16 : 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          _canReport ? _primary : const Color(0xFF9CA3AF),
+                      backgroundColor: canSubmitNow
+                          ? _primary
+                          : const Color(0xFF9CA3AF),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -324,7 +469,9 @@ class _OpinionScreenState extends State<OpinionScreen>
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFEF4444),
                         borderRadius: BorderRadius.circular(20),
@@ -371,9 +518,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
-                              color: isSelected
-                                  ? _primary
-                                  : Colors.transparent,
+                              color: isSelected ? _primary : Colors.transparent,
                               borderRadius: BorderRadius.circular(7),
                             ),
                             alignment: Alignment.center,
@@ -446,8 +591,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                             label: level,
                             count: count,
                             total: total,
-                            highlight:
-                                highlight != null && level == highlight,
+                            highlight: highlight != null && level == highlight,
                             barColor: _barColor,
                             barBg: _barBg,
                           );
@@ -465,10 +609,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                 child: Text(
                   '* 데이터는 최근 5분 이내 학생들 제보를 기반으로 합니다.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF9CA3AF),
-                  ),
+                  style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
                 ),
               ),
               const SizedBox(height: 32),
@@ -502,10 +643,7 @@ class _OpinionScreenState extends State<OpinionScreen>
           value: value,
           hint: Text(
             hint,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF9CA3AF),
-            ),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
           ),
           isExpanded: true,
           icon: const Icon(
@@ -580,9 +718,7 @@ class _CongestionBar extends StatelessWidget {
                     child: Container(
                       height: 10,
                       decoration: BoxDecoration(
-                        color: highlight
-                            ? barColor
-                            : const Color(0xFFBFDBFE),
+                        color: highlight ? barColor : const Color(0xFFBFDBFE),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
