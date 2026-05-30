@@ -2,12 +2,37 @@ from collections import deque
 from statistics import median
 
 import cv2
+import requests
 from ultralytics import YOLO
 
 # =========================
 # 1. YOLO 모델 불러오기
 # =========================
 model = YOLO("yolov8n.pt")
+
+# =========================
+# 서버 설정
+# =========================
+SERVER_URL = "http://localhost:3000/waiting-count"
+
+
+def send_waiting_count(count):
+    """검출된 정문 대기인원 수를 Node.js 서버로 전송한다."""
+    try:
+        response = requests.post(
+            SERVER_URL,
+            json={
+                "station": "정문",
+                "count": count,
+            },
+            timeout=2,
+        )
+
+        response.raise_for_status()
+        print(f"[서버 전송 성공] 정문 현재 대기인원: {count}명")
+
+    except requests.RequestException as error:
+        print(f"[서버 전송 실패] {error}")
 
 # =========================
 # 2. 노트북 웹캠 실행
@@ -113,6 +138,9 @@ while True:
 
     if stable_count != last_stable_count:
         print(f"정문 현재 대기인원: {stable_count}명")
+
+        send_waiting_count(stable_count)
+
         last_stable_count = stable_count
 
     # =========================
