@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import '../services/api_service.dart';
 
 enum TransportMode { none, bus, walk }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int? userId;
+
+  const HomeScreen({super.key, required this.userId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -13,6 +17,13 @@ class _HomeScreenState extends State<HomeScreen> {
   String selectedStation = '정문';
 
   String? activeStation;
+  Timer? _congestionTimer;
+  Timer? _scheduleTimer;
+  Timer? _busTimetableTimer;
+
+  List<Map<String, dynamic>> _schedules = [];
+  String _classTimeText = '-';
+  String _nextClassText = '-';
 
   final Map<String, TransportMode> transportModeByStation = {
     '정문': TransportMode.none,
@@ -26,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     '전정대': null,
   };
 
-  late Map<String, int> waitingCountByStation;
+  Map<String, int> waitingCountByStation = {};
 
   static const int busCapacity = 40;
 
@@ -39,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'bus': '1112번',
       'arrival': '3분 후',
       'arrivalMinute': 3,
+      'hasBusInfo': true,
       'classTime': '15분',
       'congestion': '보통',
       'waiting': 5,
@@ -48,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'bus': '1112번',
       'arrival': '5분 후',
       'arrivalMinute': 5,
+      'hasBusInfo': true,
       'classTime': '12분',
       'congestion': '혼잡',
       'waiting': 18,
@@ -57,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'bus': '1112번',
       'arrival': '7분 후',
       'arrivalMinute': 7,
+      'hasBusInfo': true,
       'classTime': '18분',
       'congestion': '약간 혼잡',
       'waiting': 10,
@@ -71,9 +85,251 @@ class _HomeScreenState extends State<HomeScreen> {
       for (final station in stations)
         station: stationData[station]!['waiting'] as int,
     };
+
+    _loadCongestionSummaries();
+    _loadSchedules();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (_isWeekend) {
+        _applyWeekendNoBusInfo(selectedStation);
+        return;
+      }
+
+      if (selectedStation == '전정대') {
+        _loadJeonjeongdaeBusTimetable();
+      } else if (selectedStation == '정문' || selectedStation == '외대') {
+        _loadRealtimeBusTimetable(selectedStation);
+      }
+    });
+
+    _congestionTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadCongestionSummaries();
+    });
+
+    _scheduleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _updateNextClassText();
+    });
+    _busTimetableTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (_isWeekend) {
+        _applyWeekendNoBusInfo(selectedStation);
+        return;
+      }
+
+      if (selectedStation == '전정대') {
+        _loadJeonjeongdaeBusTimetable();
+      } else if (selectedStation == '정문' || selectedStation == '외대') {
+        _loadRealtimeBusTimetable(selectedStation);
+      }
+    });
+  }
+
+  int? _parseTimeToMinute(String? text) {
+    if (text == null) return null;
+
+    final parts = text.trim().split(':');
+    if (parts.length != 2) return null;
+
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+
+    if (hour == null || minute == null) return null;
+
+    return hour * 60 + minute;
+  }
+
+  String _formatRemainTime(int minute) {
+    if (minute < 60) {
+      return '$minute분';
+    }
+
+    final hour = minute ~/ 60;
+    final remainingMinute = minute % 60;
+
+    if (remainingMinute == 0) {
+      return '$hour시간';
+    }
+
+    return '$hour시간 $remainingMinute분';
+  }
+
+  String _getTodayKorean(DateTime now) {
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return days[now.weekday % 7];
+  }
+
+  int _getDayIndex(String day) {
+    const days = ['월', '화', '수', '목', '금'];
+    return days.indexOf(day);
+  }
+
+  void _updateNextClassText() {
+    if (_schedules.isEmpty) {
+      setState(() {
+        _classTimeText = '-';
+        _nextClassText = '-';
+      });
+      return;
+    }
+
+    final now = DateTime.now();
+    // 테스트용 현재 시각: 화요일 08:17
+    //final now = DateTime(2026, 6, 2, 10, 17);
+    final today = _getTodayKorean(now);
+    final currentMinute = now.hour * 60 + now.minute;
+
+    Map<String, dynamic>? todayNextSchedule;
+    int? todayRemainMinute;
+
+    for (final schedule in _schedules) {
+      if (schedule['dayOfWeek'] != today) continue;
+
+      final startMinute = _parseTimeToMinute(schedule['startTime']);
+      if (startMinute == null) continue;
+
+      if (startMinute >= currentMinute) {
+        final remain = startMinute - currentMinute;
+
+        if (todayRemainMinute == null || remain < todayRemainMinute) {
+          todayRemainMinute = remain;
+          todayNextSchedule = schedule;
+        }
+      }
+    }
+
+    if (todayNextSchedule != null && todayRemainMinute != null) {
+      final buildingName = todayNextSchedule['buildingName'] ?? '';
+      final roomNumber = todayNextSchedule['roomNumber'] ?? '';
+      final startTime = todayNextSchedule['startTime'] ?? '';
+
+      setState(() {
+        _classTimeText = _formatRemainTime(todayRemainMinute!);
+        _nextClassText = '$buildingName $roomNumber · $startTime';
+      });
+      return;
+    }
+
+    final todayIndex = _getDayIndex(today);
+
+    if (todayIndex == -1) {
+      setState(() {
+        _classTimeText = '-';
+        _nextClassText = '-';
+      });
+      return;
+    }
+
+    Map<String, dynamic>? nextDayFirstSchedule;
+    int? minRemainUntilNextClass;
+
+    for (final schedule in _schedules) {
+      final scheduleDay = schedule['dayOfWeek'];
+      final scheduleDayIndex = _getDayIndex(scheduleDay);
+
+      if (scheduleDayIndex == -1) continue;
+
+      final startMinute = _parseTimeToMinute(schedule['startTime']);
+      if (startMinute == null) continue;
+
+      int dayDiff = scheduleDayIndex - todayIndex;
+      if (dayDiff <= 0) {
+        dayDiff += 5;
+      }
+
+      final remainMinute =
+          (24 * 60 - currentMinute) + ((dayDiff - 1) * 24 * 60) + startMinute;
+
+      if (minRemainUntilNextClass == null ||
+          remainMinute < minRemainUntilNextClass) {
+        minRemainUntilNextClass = remainMinute;
+        nextDayFirstSchedule = schedule;
+      }
+    }
+
+    if (nextDayFirstSchedule != null &&
+        minRemainUntilNextClass != null &&
+        minRemainUntilNextClass <= 60) {
+      final buildingName = nextDayFirstSchedule['buildingName'] ?? '';
+      final roomNumber = nextDayFirstSchedule['roomNumber'] ?? '';
+      final startTime = nextDayFirstSchedule['startTime'] ?? '';
+
+      setState(() {
+        _classTimeText = _formatRemainTime(minRemainUntilNextClass!);
+        _nextClassText = '$buildingName $roomNumber · $startTime';
+      });
+      return;
+    }
+
+    setState(() {
+      _classTimeText = '-';
+      _nextClassText = '-';
+    });
+  }
+
+  Future<void> _loadSchedules() async {
+    final userId = widget.userId;
+
+    if (userId == null) {
+      if (!mounted) return;
+
+      setState(() {
+        _schedules = [];
+        _classTimeText = '-';
+        _nextClassText = '-';
+      });
+      return;
+    }
+
+    try {
+      final result = await ApiService.getSchedules(userId: userId);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        setState(() {
+          _schedules = List<Map<String, dynamic>>.from(result['schedules']);
+        });
+
+        _updateNextClassText();
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _schedules = [];
+        _classTimeText = '-';
+        _nextClassText = '-';
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.userId != widget.userId) {
+      _loadSchedules();
+    }
+  }
+
+  @override
+  void dispose() {
+    _congestionTimer?.cancel();
+    _scheduleTimer?.cancel();
+    _busTimetableTimer?.cancel();
+    super.dispose();
   }
 
   Map<String, dynamic> get currentData => stationData[selectedStation]!;
+
+  bool get hasCurrentBusInfo => currentData['hasBusInfo'] == true;
+
+  bool get _isWeekend {
+    final now = DateTime.now();
+    return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
+    //return false;
+  }
 
   TransportMode get transportMode =>
       transportModeByStation[selectedStation] ?? TransportMode.none;
@@ -96,10 +352,37 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       selectedStation = station;
     });
+
+    _loadCongestionSummaries();
+
+    if (_isWeekend) {
+      _applyWeekendNoBusInfo(station);
+      return;
+    }
+
+    if (station == '전정대') {
+      _loadJeonjeongdaeBusTimetable();
+    } else if (station == '정문' || station == '외대') {
+      _loadRealtimeBusTimetable(station);
+    }
   }
 
   void _startBusWaiting() {
     if (!canSelectTransportMode) return;
+
+    if (!hasCurrentBusInfo) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('현재 버스 운행 정보가 없어 줄서기를 이용할 수 없어요.'),
+          backgroundColor: const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
 
     if (!isNearStation) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -160,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return 15;
     }
 
-    final arrivalMinute = currentData['arrivalMinute'] as int;
+    final arrivalMinute = currentData['arrivalMinute'] as int? ?? 0;
 
     if (myWaitingNumber == null) {
       return arrivalMinute + 9;
@@ -185,6 +468,150 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return '$busOrder번째 버스';
+  }
+
+  Future<void> _loadCongestionSummaries() async {
+    try {
+      final result = await ApiService.getOpinionSummaries();
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final summaries = result['summaries'] as Map<String, dynamic>;
+
+        setState(() {
+          for (final station in stationData.keys) {
+            final summary = summaries[station];
+
+            if (summary == null) {
+              stationData[station]!['congestion'] = '-';
+              continue;
+            }
+
+            final int reportCount = summary['reportCount'] ?? 0;
+            final String congestionLevel =
+                summary['congestionLevel'] ?? '정보 없음';
+
+            stationData[station]!['congestion'] =
+                reportCount == 0 || congestionLevel == '정보 없음'
+                ? '-'
+                : congestionLevel;
+          }
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        for (final station in stationData.keys) {
+          stationData[station]!['congestion'] = '-';
+        }
+      });
+    }
+  }
+
+  void _applyWeekendNoBusInfo(String stationName) {
+    setState(() {
+      stationData[stationName]!['recommend'] = '도보';
+      stationData[stationName]!['bus'] = '-';
+      stationData[stationName]!['arrival'] = '오늘 운행 정보가 없습니다';
+      stationData[stationName]!['arrivalMinute'] = 0;
+      stationData[stationName]!['hasBusInfo'] = false;
+
+      transportModeByStation[stationName] = TransportMode.none;
+      myWaitingNumberByStation[stationName] = null;
+
+      if (activeStation == stationName) {
+        activeStation = null;
+      }
+    });
+  }
+
+  Future<void> _loadJeonjeongdaeBusTimetable() async {
+    try {
+      final result = await ApiService.getNextBusTimetable(stationName: '전정대');
+
+      if (!mounted) return;
+
+      if (result['success'] != true) return;
+
+      final arrivals = result['arrivals'] as List<dynamic>? ?? [];
+
+      if (arrivals.isEmpty) {
+        setState(() {
+          stationData['전정대']!['recommend'] = '도보';
+          stationData['전정대']!['bus'] = '-';
+          stationData['전정대']!['arrival'] = '오늘 운행 정보가 없습니다';
+          stationData['전정대']!['arrivalMinute'] = 0;
+          stationData['전정대']!['hasBusInfo'] = false;
+
+          transportModeByStation['전정대'] = TransportMode.none;
+          myWaitingNumberByStation['전정대'] = null;
+
+          if (activeStation == '전정대') {
+            activeStation = null;
+          }
+        });
+        return;
+      }
+
+      final firstBus = Map<String, dynamic>.from(arrivals.first as Map);
+
+      setState(() {
+        stationData['전정대']!['recommend'] = '버스';
+        stationData['전정대']!['bus'] = '${firstBus['busNumber']}번';
+        stationData['전정대']!['arrival'] = firstBus['arrival'] ?? '-';
+        stationData['전정대']!['arrivalMinute'] = firstBus['arrivalMinute'] ?? 0;
+        stationData['전정대']!['hasBusInfo'] = true;
+      });
+    } catch (e) {
+      // 네트워크 오류가 나도 홈 화면 전체가 깨지면 안 되므로 기존 전정대 표시값을 유지한다.
+    }
+  }
+
+  Future<void> _loadRealtimeBusTimetable(String stationName) async {
+    try {
+      final result = await ApiService.getRealtimeNextBus(
+        stationName: stationName,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] != true) return;
+
+      final arrivals = result['arrivals'] as List<dynamic>? ?? [];
+
+      if (arrivals.isEmpty) {
+        setState(() {
+          stationData[stationName]!['recommend'] = '도보';
+          stationData[stationName]!['bus'] = '-';
+          stationData[stationName]!['arrival'] = '현재 도착 정보가 없습니다';
+          stationData[stationName]!['arrivalMinute'] = 0;
+          stationData[stationName]!['hasBusInfo'] = false;
+
+          transportModeByStation[stationName] = TransportMode.none;
+          myWaitingNumberByStation[stationName] = null;
+
+          if (activeStation == stationName) {
+            activeStation = null;
+          }
+        });
+        return;
+      }
+
+      final firstBus = Map<String, dynamic>.from(arrivals.first as Map);
+
+      setState(() {
+        stationData[stationName]!['recommend'] = '버스';
+        stationData[stationName]!['bus'] = '${firstBus['busNumber']}번';
+        stationData[stationName]!['arrival'] = firstBus['arrival'] ?? '-';
+        stationData[stationName]!['arrivalMinute'] =
+            firstBus['arrivalMinute'] ?? 0;
+        stationData[stationName]!['hasBusInfo'] = true;
+      });
+    } catch (e) {
+      // 실시간 API 실패 시 기존 화면 값을 유지한다.
+    }
   }
 
   @override
@@ -274,13 +701,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 recommend: data['recommend'] as String,
                 bus: data['bus'] as String,
                 arrival: data['arrival'] as String,
+                hasBusInfo: hasCurrentBusInfo,
                 boardingEstimate: _boardingEstimateText,
                 estimatedArrivalAfterMinute: _estimatedArrivalAfterMinute,
                 myWaitingNumber: myWaitingNumber,
               ),
 
               const SizedBox(height: 12),
-
               Row(
                 children: [
                   Expanded(
@@ -289,7 +716,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       iconColor: const Color(0xFFFF8A00),
                       iconBgColor: const Color(0xFFFFF4E5),
                       label: '수업까지',
-                      value: data['classTime'] as String,
+                      value: _classTimeText,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -321,6 +748,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 transportMode: transportMode,
                 station: selectedStation,
                 isNearStation: isNearStation,
+                hasBusInfo: hasCurrentBusInfo,
                 canSelectTransportMode: canSelectTransportMode,
                 myWaitingNumber: myWaitingNumber,
                 onBusTap: _startBusWaiting,
@@ -343,12 +771,14 @@ class _RecommendationCard extends StatelessWidget {
   final String boardingEstimate;
   final int estimatedArrivalAfterMinute;
   final int? myWaitingNumber;
+  final bool hasBusInfo;
 
   const _RecommendationCard({
     required this.transportMode,
     required this.recommend,
     required this.bus,
     required this.arrival,
+    required this.hasBusInfo,
     required this.boardingEstimate,
     required this.estimatedArrivalAfterMinute,
     required this.myWaitingNumber,
@@ -405,7 +835,11 @@ class _RecommendationCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isWalking ? '도보 이동을 선택했습니다' : '$recommend 탑승을 권장합니다',
+                  isWalking
+                      ? '도보 이동을 선택했습니다'
+                      : hasBusInfo
+                      ? '$recommend 탑승을 권장합니다'
+                      : '도보 이동을 권장합니다',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 17,
@@ -444,7 +878,11 @@ class _RecommendationCard extends StatelessWidget {
                       : Text(
                           isWalking
                               ? '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다'
-                              : '$bus 버스가 $arrival 도착합니다',
+                              : hasBusInfo
+                              ? arrival == '곧 출발'
+                                    ? '$bus 버스가 곧 도착합니다'
+                                    : '$bus 버스가 $arrival 도착합니다'
+                              : '오늘 운행 정보가 없습니다',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -569,6 +1007,7 @@ class _TransportModeCard extends StatelessWidget {
   final TransportMode transportMode;
   final String station;
   final bool isNearStation;
+  final bool hasBusInfo;
   final bool canSelectTransportMode;
   final int? myWaitingNumber;
   final VoidCallback onBusTap;
@@ -579,6 +1018,7 @@ class _TransportModeCard extends StatelessWidget {
     required this.transportMode,
     required this.station,
     required this.isNearStation,
+    required this.hasBusInfo,
     required this.canSelectTransportMode,
     required this.myWaitingNumber,
     required this.onBusTap,
@@ -629,7 +1069,8 @@ class _TransportModeCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: isNearStation && canSelectTransportMode
+                    onPressed:
+                        hasBusInfo && isNearStation && canSelectTransportMode
                         ? onBusTap
                         : null,
                     style: ElevatedButton.styleFrom(
@@ -650,13 +1091,17 @@ class _TransportModeCard extends StatelessWidget {
                         children: [
                           const Icon(Icons.directions_bus_filled_rounded),
                           const SizedBox(height: 5),
-                          const Text(
-                            '버스 줄서기',
-                            style: TextStyle(fontWeight: FontWeight.w900),
+                          Text(
+                            hasBusInfo ? '버스 줄서기' : '운행 정보 없음',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            isNearStation ? '정류장 근처 확인됨' : '정류장 근처에서만',
+                            !hasBusInfo
+                                ? '현재 이용 불가'
+                                : isNearStation
+                                ? '정류장 근처 확인됨'
+                                : '정류장 근처에서만',
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,

@@ -14,15 +14,39 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int selectedIndex = 0;
 
-  final List<Widget> screens = const [
-    HomeScreen(),
-    ReservationScreen(),
-    OpinionScreen(),
-    ProfileScreen(),
-  ];
+  int? currentUserId;
+  String? currentUsername;
+  bool currentNeedsWheelchair = false;
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> screens = [
+      HomeScreen(userId: currentUserId),
+      ReservationScreen(
+        key: ValueKey(currentUserId),
+        userId: currentUserId,
+        needsWheelchair: currentNeedsWheelchair,
+      ),
+      OpinionScreen(key: ValueKey(currentUserId), userId: currentUserId),
+      ProfileScreen(
+        userId: currentUserId,
+        onLoginSuccess: (user) {
+          setState(() {
+            currentUserId = user['id'];
+            currentUsername = user['username'];
+            currentNeedsWheelchair = user['needsWheelchair'] == true;
+          });
+        },
+        onLogoutSuccess: () {
+          setState(() {
+            currentUserId = null;
+            currentUsername = null;
+            currentNeedsWheelchair = false;
+          });
+        },
+      ),
+    ];
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
