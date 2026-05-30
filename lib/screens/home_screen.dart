@@ -19,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? activeStation;
   Timer? _congestionTimer;
   Timer? _scheduleTimer;
+  Timer? _busTimetableTimer;
 
   List<Map<String, dynamic>> _schedules = [];
   String _classTimeText = '-';
@@ -49,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'bus': '1112번',
       'arrival': '3분 후',
       'arrivalMinute': 3,
+      'hasBusInfo': true,
       'classTime': '15분',
       'congestion': '보통',
       'waiting': 5,
@@ -58,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'bus': '1112번',
       'arrival': '5분 후',
       'arrivalMinute': 5,
+      'hasBusInfo': true,
       'classTime': '12분',
       'congestion': '혼잡',
       'waiting': 18,
@@ -67,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'bus': '1112번',
       'arrival': '7분 후',
       'arrivalMinute': 7,
+      'hasBusInfo': true,
       'classTime': '18분',
       'congestion': '약간 혼잡',
       'waiting': 10,
@@ -91,6 +95,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _scheduleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       _updateNextClassText();
+    });
+    _busTimetableTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (selectedStation == '전정대') {
+        _loadJeonjeongdaeBusTimetable();
+      }
     });
   }
 
@@ -286,10 +295,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _congestionTimer?.cancel();
     _scheduleTimer?.cancel();
+    _busTimetableTimer?.cancel();
     super.dispose();
   }
 
   Map<String, dynamic> get currentData => stationData[selectedStation]!;
+
+  bool get hasCurrentBusInfo => currentData['hasBusInfo'] == true;
 
   TransportMode get transportMode =>
       transportModeByStation[selectedStation] ?? TransportMode.none;
@@ -314,10 +326,28 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     _loadCongestionSummaries();
+
+    if (station == '전정대') {
+      _loadJeonjeongdaeBusTimetable();
+    }
   }
 
   void _startBusWaiting() {
     if (!canSelectTransportMode) return;
+
+    if (!hasCurrentBusInfo) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('현재 버스 운행 정보가 없어 줄서기를 이용할 수 없어요.'),
+          backgroundColor: const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
 
     if (!isNearStation) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -378,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return 15;
     }
 
-    final arrivalMinute = currentData['arrivalMinute'] as int;
+    final arrivalMinute = currentData['arrivalMinute'] as int? ?? 0;
 
     if (myWaitingNumber == null) {
       return arrivalMinute + 9;
@@ -442,6 +472,48 @@ class _HomeScreenState extends State<HomeScreen> {
           stationData[station]!['congestion'] = '-';
         }
       });
+    }
+  }
+
+  Future<void> _loadJeonjeongdaeBusTimetable() async {
+    try {
+      final result = await ApiService.getNextBusTimetable(stationName: '전정대');
+
+      if (!mounted) return;
+
+      if (result['success'] != true) return;
+
+      final arrivals = result['arrivals'] as List<dynamic>? ?? [];
+
+      if (arrivals.isEmpty) {
+        setState(() {
+          stationData['전정대']!['recommend'] = '도보';
+          stationData['전정대']!['bus'] = '-';
+          stationData['전정대']!['arrival'] = '오늘 운행 정보가 없습니다';
+          stationData['전정대']!['arrivalMinute'] = 0;
+          stationData['전정대']!['hasBusInfo'] = false;
+
+          transportModeByStation['전정대'] = TransportMode.none;
+          myWaitingNumberByStation['전정대'] = null;
+
+          if (activeStation == '전정대') {
+            activeStation = null;
+          }
+        });
+        return;
+      }
+
+      final firstBus = Map<String, dynamic>.from(arrivals.first as Map);
+
+      setState(() {
+        stationData['전정대']!['recommend'] = '버스';
+        stationData['전정대']!['bus'] = '${firstBus['busNumber']}번';
+        stationData['전정대']!['arrival'] = firstBus['arrival'] ?? '-';
+        stationData['전정대']!['arrivalMinute'] = firstBus['arrivalMinute'] ?? 0;
+        stationData['전정대']!['hasBusInfo'] = true;
+      });
+    } catch (e) {
+      // 네트워크 오류가 나도 홈 화면 전체가 깨지면 안 되므로 기존 전정대 표시값을 유지한다.
     }
   }
 
@@ -532,6 +604,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 recommend: data['recommend'] as String,
                 bus: data['bus'] as String,
                 arrival: data['arrival'] as String,
+                hasBusInfo: hasCurrentBusInfo,
                 boardingEstimate: _boardingEstimateText,
                 estimatedArrivalAfterMinute: _estimatedArrivalAfterMinute,
                 myWaitingNumber: myWaitingNumber,
@@ -578,6 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 transportMode: transportMode,
                 station: selectedStation,
                 isNearStation: isNearStation,
+                hasBusInfo: hasCurrentBusInfo,
                 canSelectTransportMode: canSelectTransportMode,
                 myWaitingNumber: myWaitingNumber,
                 onBusTap: _startBusWaiting,
@@ -600,12 +674,14 @@ class _RecommendationCard extends StatelessWidget {
   final String boardingEstimate;
   final int estimatedArrivalAfterMinute;
   final int? myWaitingNumber;
+  final bool hasBusInfo;
 
   const _RecommendationCard({
     required this.transportMode,
     required this.recommend,
     required this.bus,
     required this.arrival,
+    required this.hasBusInfo,
     required this.boardingEstimate,
     required this.estimatedArrivalAfterMinute,
     required this.myWaitingNumber,
@@ -662,7 +738,11 @@ class _RecommendationCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isWalking ? '도보 이동을 선택했습니다' : '$recommend 탑승을 권장합니다',
+                  isWalking
+                      ? '도보 이동을 선택했습니다'
+                      : hasBusInfo
+                      ? '$recommend 탑승을 권장합니다'
+                      : '도보 이동을 권장합니다',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 17,
@@ -701,7 +781,11 @@ class _RecommendationCard extends StatelessWidget {
                       : Text(
                           isWalking
                               ? '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다'
-                              : '$bus 버스가 $arrival 도착합니다',
+                              : hasBusInfo
+                              ? arrival == '곧 출발'
+                                    ? '$bus 버스가 곧 도착합니다'
+                                    : '$bus 버스가 $arrival 도착합니다'
+                              : '오늘 운행 정보가 없습니다',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -826,6 +910,7 @@ class _TransportModeCard extends StatelessWidget {
   final TransportMode transportMode;
   final String station;
   final bool isNearStation;
+  final bool hasBusInfo;
   final bool canSelectTransportMode;
   final int? myWaitingNumber;
   final VoidCallback onBusTap;
@@ -836,6 +921,7 @@ class _TransportModeCard extends StatelessWidget {
     required this.transportMode,
     required this.station,
     required this.isNearStation,
+    required this.hasBusInfo,
     required this.canSelectTransportMode,
     required this.myWaitingNumber,
     required this.onBusTap,
@@ -886,7 +972,8 @@ class _TransportModeCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: isNearStation && canSelectTransportMode
+                    onPressed:
+                        hasBusInfo && isNearStation && canSelectTransportMode
                         ? onBusTap
                         : null,
                     style: ElevatedButton.styleFrom(
@@ -907,13 +994,17 @@ class _TransportModeCard extends StatelessWidget {
                         children: [
                           const Icon(Icons.directions_bus_filled_rounded),
                           const SizedBox(height: 5),
-                          const Text(
-                            '버스 줄서기',
-                            style: TextStyle(fontWeight: FontWeight.w900),
+                          Text(
+                            hasBusInfo ? '버스 줄서기' : '운행 정보 없음',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            isNearStation ? '정류장 근처 확인됨' : '정류장 근처에서만',
+                            !hasBusInfo
+                                ? '현재 이용 불가'
+                                : isNearStation
+                                ? '정류장 근처 확인됨'
+                                : '정류장 근처에서만',
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,

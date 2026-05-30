@@ -171,4 +171,33 @@ class ApiService {
 
     return jsonDecode(response.body);
   }
+
+  static Future<Map<String, dynamic>> getNextBusTimetable({
+    required String stationName,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/bus/timetable/next',
+    ).replace(queryParameters: {'stationName': stationName});
+
+    final response = await http.get(uri);
+
+    return jsonDecode(response.body);
+  }
+
+  /*테스트용(평일)
+  static Future<Map<String, dynamic>> getNextBusTimetable({
+    required String stationName,
+  }) async {
+    final uri = Uri.parse('$baseUrl/bus/timetable/next').replace(
+      queryParameters: {
+        'stationName': stationName,
+        'dayOfWeek': '월',
+        'time': '09:00',
+      },
+    );
+
+    final response = await http.get(uri);
+
+    return jsonDecode(response.body);
+  }*/
 }
