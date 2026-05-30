@@ -31,6 +31,12 @@ class _OpinionScreenState extends State<OpinionScreen>
   String? _selectedLocation;
   String? _selectedCongestion;
 
+  bool get _isWeekend {
+    final now = DateTime.now();
+    return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
+    //return false;
+  }
+
   // ── 탭 선택 상태 ─────────────────────────────
   int _selectedTab = 0;
 
@@ -106,6 +112,30 @@ class _OpinionScreenState extends State<OpinionScreen>
     return '$s초';
   }
 
+  void _showWeekendReportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            '제보 불가',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: const Text('주말에는 혼잡도 제보를 이용할 수 없습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // ── 제보 처리 ────────────────────────────────
   Future<void> _submitReport() async {
     if (widget.userId == null) {
@@ -119,6 +149,10 @@ class _OpinionScreenState extends State<OpinionScreen>
           ),
         ),
       );
+      return;
+    }
+    if (_isWeekend) {
+      _showWeekendReportDialog();
       return;
     }
     if (_selectedLocation == null || _selectedCongestion == null) {
@@ -286,7 +320,10 @@ class _OpinionScreenState extends State<OpinionScreen>
   // ────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    super.build(context); // AutomaticKeepAliveClientMixin 필수
+    super.build(context);
+
+    final bool canSubmitNow = !_isWeekend && _canReport;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -383,18 +420,26 @@ class _OpinionScreenState extends State<OpinionScreen>
                   child: ElevatedButton.icon(
                     onPressed: _submitReport,
                     icon: Icon(
-                      _canReport ? Icons.play_arrow : Icons.lock_clock,
+                      _isWeekend
+                          ? Icons.block
+                          : _canReport
+                          ? Icons.play_arrow
+                          : Icons.lock_clock,
                       size: 20,
                     ),
                     label: Text(
-                      _canReport ? '제보하기' : '$_cooldownText 후 제보 가능합니다',
+                      _isWeekend
+                          ? '제보 불가'
+                          : _canReport
+                          ? '제보하기'
+                          : '$_cooldownText 후 제보 가능합니다',
                       style: TextStyle(
-                        fontSize: _canReport ? 16 : 13,
+                        fontSize: canSubmitNow ? 16 : 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _canReport
+                      backgroundColor: canSubmitNow
                           ? _primary
                           : const Color(0xFF9CA3AF),
                       foregroundColor: Colors.white,

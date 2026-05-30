@@ -22,6 +22,12 @@ class _ReservationScreenState extends State<ReservationScreen> {
   final Map<String, String> myReservedTimesByStop = {};
   final Map<String, Set<String>> occupiedTimesByStop = {};
 
+  bool get _isWeekend {
+    final now = DateTime.now();
+    return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
+    //return false;
+  }
+
   Timer? _reservationTimer;
 
   @override
@@ -315,6 +321,30 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
+  void _showWeekendReservationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            '예약 불가',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: const Text('주말에는 예약 기능을 이용할 수 없습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _reserveTime(String time) async {
     if (widget.userId == null) {
       ScaffoldMessenger.of(
@@ -329,6 +359,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
     }
 
     if (selectedStop == null) return;
+
+    if (_isWeekend) {
+      _showWeekendReservationDialog();
+      return;
+    }
 
     try {
       final result = await ApiService.createReservation(
@@ -637,6 +672,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
               final bool isPastTime = _isPastTime(time);
 
               final bool isDisabled =
+                  _isWeekend ||
                   isPastTime ||
                   isReservedByOther ||
                   (hasMyReservationAtStop && !isMyReservation);
@@ -670,6 +706,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           child: ElevatedButton(
                             onPressed: () {
                               if (selectedStop == null) return;
+
+                              if (_isWeekend) {
+                                _showWeekendReservationDialog();
+                                return;
+                              }
 
                               if (isPastTime) {
                                 _showInvalidTimeDialog();

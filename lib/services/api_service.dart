@@ -184,7 +184,7 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
-  /*테스트용(평일)
+  /*//테스트용(평일)
   static Future<Map<String, dynamic>> getNextBusTimetable({
     required String stationName,
   }) async {
