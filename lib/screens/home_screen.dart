@@ -89,6 +89,21 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCongestionSummaries();
     _loadSchedules();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (_isWeekend) {
+        _applyWeekendNoBusInfo(selectedStation);
+        return;
+      }
+
+      if (selectedStation == '전정대') {
+        _loadJeonjeongdaeBusTimetable();
+      } else if (selectedStation == '정문' || selectedStation == '외대') {
+        _loadRealtimeBusTimetable(selectedStation);
+      }
+    });
+
     _congestionTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _loadCongestionSummaries();
     });
@@ -97,8 +112,15 @@ class _HomeScreenState extends State<HomeScreen> {
       _updateNextClassText();
     });
     _busTimetableTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (_isWeekend) {
+        _applyWeekendNoBusInfo(selectedStation);
+        return;
+      }
+
       if (selectedStation == '전정대') {
         _loadJeonjeongdaeBusTimetable();
+      } else if (selectedStation == '정문' || selectedStation == '외대') {
+        _loadRealtimeBusTimetable(selectedStation);
       }
     });
   }
@@ -303,6 +325,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool get hasCurrentBusInfo => currentData['hasBusInfo'] == true;
 
+  bool get _isWeekend {
+    final now = DateTime.now();
+    return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
+    //return false;
+  }
+
   TransportMode get transportMode =>
       transportModeByStation[selectedStation] ?? TransportMode.none;
 
@@ -327,8 +355,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _loadCongestionSummaries();
 
+    if (_isWeekend) {
+      _applyWeekendNoBusInfo(station);
+      return;
+    }
+
     if (station == '전정대') {
       _loadJeonjeongdaeBusTimetable();
+    } else if (station == '정문' || station == '외대') {
+      _loadRealtimeBusTimetable(station);
     }
   }
 
@@ -475,6 +510,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _applyWeekendNoBusInfo(String stationName) {
+    setState(() {
+      stationData[stationName]!['recommend'] = '도보';
+      stationData[stationName]!['bus'] = '-';
+      stationData[stationName]!['arrival'] = '오늘 운행 정보가 없습니다';
+      stationData[stationName]!['arrivalMinute'] = 0;
+      stationData[stationName]!['hasBusInfo'] = false;
+
+      transportModeByStation[stationName] = TransportMode.none;
+      myWaitingNumberByStation[stationName] = null;
+
+      if (activeStation == stationName) {
+        activeStation = null;
+      }
+    });
+  }
+
   Future<void> _loadJeonjeongdaeBusTimetable() async {
     try {
       final result = await ApiService.getNextBusTimetable(stationName: '전정대');
@@ -514,6 +566,51 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       // 네트워크 오류가 나도 홈 화면 전체가 깨지면 안 되므로 기존 전정대 표시값을 유지한다.
+    }
+  }
+
+  Future<void> _loadRealtimeBusTimetable(String stationName) async {
+    try {
+      final result = await ApiService.getRealtimeNextBus(
+        stationName: stationName,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] != true) return;
+
+      final arrivals = result['arrivals'] as List<dynamic>? ?? [];
+
+      if (arrivals.isEmpty) {
+        setState(() {
+          stationData[stationName]!['recommend'] = '도보';
+          stationData[stationName]!['bus'] = '-';
+          stationData[stationName]!['arrival'] = '현재 도착 정보가 없습니다';
+          stationData[stationName]!['arrivalMinute'] = 0;
+          stationData[stationName]!['hasBusInfo'] = false;
+
+          transportModeByStation[stationName] = TransportMode.none;
+          myWaitingNumberByStation[stationName] = null;
+
+          if (activeStation == stationName) {
+            activeStation = null;
+          }
+        });
+        return;
+      }
+
+      final firstBus = Map<String, dynamic>.from(arrivals.first as Map);
+
+      setState(() {
+        stationData[stationName]!['recommend'] = '버스';
+        stationData[stationName]!['bus'] = '${firstBus['busNumber']}번';
+        stationData[stationName]!['arrival'] = firstBus['arrival'] ?? '-';
+        stationData[stationName]!['arrivalMinute'] =
+            firstBus['arrivalMinute'] ?? 0;
+        stationData[stationName]!['hasBusInfo'] = true;
+      });
+    } catch (e) {
+      // 실시간 API 실패 시 기존 화면 값을 유지한다.
     }
   }
 
