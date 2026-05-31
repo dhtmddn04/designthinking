@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math';
+import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 
 enum TransportMode { none, bus, walk }
@@ -15,6 +17,21 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String selectedStation = '정문';
+
+  // GPS
+  StreamSubscription<Position>? _positionSubscription;
+  Position? _currentPosition;
+  bool _locationPermissionGranted = false;
+
+  // 각 정류장의 실제 GPS 좌표 (위도, 경도)
+  // TODO: 실제 정류장 좌표로 교체 필요
+  static const Map<String, Map<String, double>> stationCoordinates = {
+    '정문': {'lat': 37.24752, 'lng': 127.0779},
+    '외대': {'lat': 37.24512, 'lng': 127.078460},
+    '전정대': {'lat': 37.24051, 'lng': 127.0825},
+  };
+
+  static const double nearStationThresholdMeters = 20.0;
 
   String? activeStation;
   Timer? _congestionTimer;
@@ -90,6 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCongestionSummaries();
     _loadSchedules();
     _loadWaitingCount();
+    _initLocation();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -324,6 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _scheduleTimer?.cancel();
     _busTimetableTimer?.cancel();
     _waitingCountTimer?.cancel();
+    _positionSubscription?.cancel();
     super.dispose();
   }
 
@@ -358,7 +377,95 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 지금은 GPS 시뮬레이션:
   // 정문을 선택했을 때만 정류장 50m 이내라고 가정
-  bool get isNearStation => selectedStation == '정문';
+  String get _locationStatusText {
+    if (!_locationPermissionGranted) return '📍 위치 권한이 필요합니다';
+    if (_currentPosition == null) return '📍 위치 정보를 가져오는 중...';
+
+    final coords = stationCoordinates[selectedStation];
+    if (coords == null) return '📍 위치 정보 없음';
+
+    final distance = _calculateDistance(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      coords['lat']!,
+      coords['lng']!,
+    );
+
+    final distanceText = distance < 1000
+        ? '${distance.toStringAsFixed(0)}m'
+        : '${(distance / 1000).toStringAsFixed(1)}km';
+
+    return isNearStation
+        ? '📍 현재 위치: 정류장 근처 ($distanceText · 20m 이내)'
+        : '📍 현재 위치: 정류장까지 $distanceText (20m 이상)';
+  }
+
+  bool get isNearStation {
+    if (!_locationPermissionGranted || _currentPosition == null) return false;
+
+    final coords = stationCoordinates[selectedStation];
+    if (coords == null) return false;
+
+    final distance = _calculateDistance(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      coords['lat']!,
+      coords['lng']!,
+    );
+
+    return distance <= nearStationThresholdMeters;
+  }
+
+  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+    const earthRadius = 6371000.0;
+    final dLat = _toRad(lat2 - lat1);
+    final dLng = _toRad(lng2 - lng1);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRad(lat1)) * cos(_toRad(lat2)) *
+        sin(dLng / 2) * sin(dLng / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  double _toRad(double deg) => deg * pi / 180;
+
+  Future<void> _initLocation() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      if (!mounted) return;
+      setState(() { _locationPermissionGranted = false; });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() { _locationPermissionGranted = true; });
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (!mounted) return;
+      setState(() { _currentPosition = position; });
+    } catch (_) {}
+
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 0,
+      ),
+    ).listen((position) {
+      if (!mounted) return;
+      setState(() { _currentPosition = position; });
+    });
+  }
 
   void _changeStation(String station) {
     setState(() {
@@ -770,6 +877,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 hasBusInfo: hasCurrentBusInfo,
                 canSelectTransportMode: canSelectTransportMode,
                 myWaitingNumber: myWaitingNumber,
+                locationStatusText: _locationStatusText,
                 onBusTap: _startBusWaiting,
                 onWalkTap: _startWalking,
                 onCancel: _cancelTransportMode,
@@ -1029,6 +1137,7 @@ class _TransportModeCard extends StatelessWidget {
   final bool hasBusInfo;
   final bool canSelectTransportMode;
   final int? myWaitingNumber;
+  final String locationStatusText;
   final VoidCallback onBusTap;
   final VoidCallback onWalkTap;
   final VoidCallback onCancel;
@@ -1040,6 +1149,7 @@ class _TransportModeCard extends StatelessWidget {
     required this.hasBusInfo,
     required this.canSelectTransportMode,
     required this.myWaitingNumber,
+    required this.locationStatusText,
     required this.onBusTap,
     required this.onWalkTap,
     required this.onCancel,
@@ -1175,9 +1285,7 @@ class _TransportModeCard extends StatelessWidget {
                 border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
               child: Text(
-                isNearStation
-                    ? '📍 현재 위치: 정류장 근처 (50m 이내)'
-                    : '📍 현재 위치: 정류장 도착 필요 (50m 이상)',
+                locationStatusText,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: isNearStation
