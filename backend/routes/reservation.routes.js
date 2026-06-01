@@ -14,6 +14,17 @@ function getTodayString() {
 }
 
 function isPastTime(reservedTime) {
+  /*const realNow = new Date();
+
+  // 테스트용: 오늘 14시로 가정
+  const now = new Date(
+    realNow.getFullYear(),
+    realNow.getMonth(),
+    realNow.getDate(),
+    14,
+    0
+  );*/
+
   const now = new Date();
 
   const [hour, minute] = reservedTime.split(':').map(Number);
@@ -143,6 +154,25 @@ try {
       });
     }
 
+    const [sameTimeReservations] = await db.query(
+      `
+      SELECT id, stop_name
+      FROM reservations
+      WHERE user_id = ?
+        AND reserved_time = ?
+        AND status = 'active'
+      LIMIT 1
+      `,
+      [userId, reservedTime]
+    );
+
+    if (sameTimeReservations.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: '이미 같은 시간대에 다른 정류장 예약이 있습니다.',
+      });
+    }
+
     await db.query(
       `
       INSERT INTO reservations (user_id, stop_name, bus_number, reserved_time)
@@ -178,7 +208,17 @@ router.get('/', async (req, res) => {
 
     const [reservations] = await db.query(
       `
-      SELECT id, user_id, stop_name, bus_number, reserved_time, status, created_at
+      SELECT
+        id,
+        user_id,
+        stop_name,
+        bus_number,
+        reserved_time,
+        status,
+        boarding_bus_number,
+        boarding_time,
+        boarding_confirmed_at,
+        created_at
       FROM reservations
       WHERE status = 'active'
       ORDER BY created_at DESC
@@ -199,13 +239,67 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/boarding-status', async (req, res) => {
+  const stationName = req.query.stationName?.trim();
+  const busNumber = req.query.busNumber?.trim();
+  const boardingTime = req.query.boardingTime?.trim();
+
+  if (!stationName || !busNumber || !boardingTime) {
+    return res.status(400).json({
+      success: false,
+      message: 'stationName, busNumber, boardingTime이 필요합니다.',
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT COUNT(*) AS reservationCount
+      FROM reservations r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.status = 'active'
+        AND r.stop_name = ?
+        AND r.boarding_bus_number = ?
+        AND r.boarding_time = ?
+        AND u.needs_wheelchair = 1
+      `,
+      [stationName, busNumber, boardingTime]
+    );
+
+    const reservationCount = rows[0].reservationCount ?? 0;
+
+    return res.json({
+      success: true,
+      hasWheelchairReservation: reservationCount > 0,
+      reservationCount,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: '휠체어 예약자 조회 중 서버 오류가 발생했습니다.',
+    });
+  }
+});
+
 router.get('/user/:userId', async (req, res) => {
   const { userId } = req.params;
 
   try {
     const [reservations] = await db.query(
       `
-      SELECT id, user_id, stop_name, bus_number, reserved_time, status, created_at
+      SELECT
+        id,
+        user_id,
+        stop_name,
+        bus_number,
+        reserved_time,
+        status,
+        boarding_bus_number,
+        boarding_time,
+        boarding_confirmed_at,
+        created_at
       FROM reservations
       WHERE user_id = ? AND status = 'active'
       ORDER BY created_at DESC

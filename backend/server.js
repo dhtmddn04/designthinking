@@ -96,3 +96,13 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+if (typeof busRoutes.processPendingBoardingRecommendations === 'function') {
+  busRoutes.processPendingBoardingRecommendations();
+}
+
+setInterval(() => {
+  if (typeof busRoutes.processPendingBoardingRecommendations === 'function') {
+    busRoutes.processPendingBoardingRecommendations();
+  }
+}, 60 * 1000);
