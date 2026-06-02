@@ -581,7 +581,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
                     const SizedBox(height: 12),
 
-                    _ticketInfoBox(label: '이용 버스', value: busInfo),
+                    _ticketInfoBox(label: '이용 버스', value: busInfo, valueFontSize: 13),
 
                     const SizedBox(height: 12),
 
@@ -665,7 +665,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
-  Widget _ticketInfoBox({required String label, required String value}) {
+  Widget _ticketInfoBox({
+    required String label,
+    required String value,
+    double valueFontSize = 16,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -687,9 +691,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: valueFontSize,
               fontWeight: FontWeight.w700,
             ),
           ),

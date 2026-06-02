@@ -140,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _congestionTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _loadCongestionSummaries();
     });
-    _waitingCountTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    _waitingCountTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _loadWaitingCount();
     });
 
@@ -195,11 +195,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return days[now.weekday % 7];
   }
 
-  int _getDayIndex(String day) {
-    const days = ['월', '화', '수', '목', '금'];
-    return days.indexOf(day);
-  }
-
   void _updateNextClassText() {
     if (_schedules.isEmpty) {
       setState(() {
@@ -210,8 +205,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final now = DateTime.now();
-    // 테스트용 현재 시각: 화요일 08:17
-    //final now = DateTime(2026, 6, 2, 10, 17);
+
+    // 테스트용 현재 시각이 필요할 때만 아래처럼 임시로 변경
+    // final now = DateTime(2026, 6, 2, 10, 17);
+
     final today = _getTodayKorean(now);
     final currentMinute = now.hour * 60 + now.minute;
 
@@ -241,57 +238,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _classTimeText = _formatRemainTime(todayRemainMinute!);
-        _nextClassText = '$buildingName $roomNumber · $startTime';
-      });
-      return;
-    }
-
-    final todayIndex = _getDayIndex(today);
-
-    if (todayIndex == -1) {
-      setState(() {
-        _classTimeText = '-';
-        _nextClassText = '-';
-      });
-      return;
-    }
-
-    Map<String, dynamic>? nextDayFirstSchedule;
-    int? minRemainUntilNextClass;
-
-    for (final schedule in _schedules) {
-      final scheduleDay = schedule['dayOfWeek'];
-      final scheduleDayIndex = _getDayIndex(scheduleDay);
-
-      if (scheduleDayIndex == -1) continue;
-
-      final startMinute = _parseTimeToMinute(schedule['startTime']);
-      if (startMinute == null) continue;
-
-      int dayDiff = scheduleDayIndex - todayIndex;
-      if (dayDiff <= 0) {
-        dayDiff += 5;
-      }
-
-      final remainMinute =
-          (24 * 60 - currentMinute) + ((dayDiff - 1) * 24 * 60) + startMinute;
-
-      if (minRemainUntilNextClass == null ||
-          remainMinute < minRemainUntilNextClass) {
-        minRemainUntilNextClass = remainMinute;
-        nextDayFirstSchedule = schedule;
-      }
-    }
-
-    if (nextDayFirstSchedule != null &&
-        minRemainUntilNextClass != null &&
-        minRemainUntilNextClass <= 60) {
-      final buildingName = nextDayFirstSchedule['buildingName'] ?? '';
-      final roomNumber = nextDayFirstSchedule['roomNumber'] ?? '';
-      final startTime = nextDayFirstSchedule['startTime'] ?? '';
-
-      setState(() {
-        _classTimeText = _formatRemainTime(minRemainUntilNextClass!);
         _nextClassText = '$buildingName $roomNumber · $startTime';
       });
       return;
@@ -485,7 +431,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 0,
+            distanceFilter: 3,
           ),
         ).listen((position) {
           if (!mounted) return;
@@ -653,6 +599,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (result['success'] == true) {
         final int count = result['count'] ?? 0;
+        final int currentCount = waitingCountByStation['정문'] ?? 0;
+
+        if (count == currentCount) {
+          return;
+        }
 
         setState(() {
           waitingCountByStation['정문'] = count;
