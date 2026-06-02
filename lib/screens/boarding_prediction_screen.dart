@@ -387,10 +387,12 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                         children: [
                           Text(
                             capacityText,
+                            textAlign: TextAlign.right,
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF374151),
+                              height: 1.4,
                             ),
                           ),
                           const SizedBox(height: 4),
