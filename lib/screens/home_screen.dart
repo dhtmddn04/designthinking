@@ -120,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCongestionSummaries();
     _loadSchedules();
     _loadWaitingCount();
-    //_initLocation();
+    _initLocation();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
