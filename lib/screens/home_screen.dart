@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
+import 'boarding_prediction_screen.dart';
 
 enum TransportMode { none, bus, walk }
 
@@ -39,6 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _scheduleTimer;
   Timer? _busTimetableTimer;
   Timer? _waitingCountTimer;
+  bool _isOpeningPrediction = false;
+
 
   List<Map<String, dynamic>> _schedules = [];
   String _classTimeText = '-';
@@ -90,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'hasBusInfo': true,
       'classTime': '12분',
       'congestion': '혼잡',
-      'waiting': 18,
+      'waiting': 73,
     },
     '전정대': {
       'recommend': '버스',
@@ -104,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'hasBusInfo': true,
       'classTime': '18분',
       'congestion': '약간 혼잡',
-      'waiting': 10,
+      'waiting': 45,
     },
   };
 
@@ -327,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int get waitingCount =>
       waitingCountByStation[selectedStation] ??
-      stationData[selectedStation]!['waiting'] as int;
+          stationData[selectedStation]!['waiting'] as int;
 
   int? get myWaitingNumber => myWaitingNumberByStation[selectedStation];
 
@@ -359,6 +362,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ? '📍 현재 위치: 정류장 근처 ($distanceText · 20m 이내)'
         : '📍 현재 위치: 정류장까지 $distanceText (20m 이상)';
   }
+/* 테스트용 GPS
+  bool get isNearStation {
+    return true;
+  } */
+
 
   bool get isNearStation {
     if (!_locationPermissionGranted || _currentPosition == null) return false;
@@ -377,17 +385,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   double _calculateDistance(
-    double lat1,
-    double lng1,
-    double lat2,
-    double lng2,
-  ) {
+      double lat1,
+      double lng1,
+      double lat2,
+      double lng2,
+      ) {
     const earthRadius = 6371000.0;
     final dLat = _toRad(lat2 - lat1);
     final dLng = _toRad(lng2 - lng1);
     final a =
         sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRad(lat1)) * cos(_toRad(lat2)) * sin(dLng / 2) * sin(dLng / 2);
+            cos(_toRad(lat1)) * cos(_toRad(lat2)) * sin(dLng / 2) * sin(dLng / 2);
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;
   }
@@ -460,7 +468,192 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _startBusWaiting() {
+  static const int predictionCapacity = 30;
+
+  String _predictionBusKey(Map<String, dynamic> bus) {
+    final plateNo = bus['plateNo']?.toString();
+    if (plateNo != null && plateNo.isNotEmpty) return plateNo;
+
+    final busNumber = bus['busNumber']?.toString() ?? '';
+    final time = bus['expectedArrivalTime']?.toString() ??
+        bus['departureTime']?.toString() ??
+        '';
+    return '$busNumber|$time';
+  }
+
+  Future<Map<String, dynamic>?> _calculateBoardingPrediction(
+      String stationName, {
+        String? excludedBusKey,
+      }) async {
+    int waitingCountAtStart;
+
+    if (stationName == '정문') {
+      final waitingResult = await ApiService.getWaitingCount(
+        stationName: '정문',
+      );
+
+      if (waitingResult['success'] != true) {
+        return null;
+      }
+
+      waitingCountAtStart = waitingResult['count'] as int? ?? 0;
+    } else {
+      // 외대와 전정대는 프로토타입 시연용 설정값을 사용한다.
+      waitingCountAtStart = waitingCountByStation[stationName] ?? 0;
+    }
+
+    Map<String, dynamic> busResult;
+
+    if (stationName == '전정대') {
+      busResult = await ApiService.getNextBusTimetable(
+        stationName: stationName,
+      );
+    } else {
+      busResult = await ApiService.getRealtimeNextBus(
+        stationName: stationName,
+      );
+    }
+
+    if (busResult['success'] != true) {
+      return null;
+    }
+
+    final List<dynamic> rawArrivals =
+        busResult['arrivals'] as List<dynamic>? ?? [];
+    final List<Map<String, dynamic>> arrivals = rawArrivals
+        .map((bus) => Map<String, dynamic>.from(bus as Map))
+        .toList();
+
+    Map<String, dynamic>? recommendedBus;
+    final List<Map<String, dynamic>> analyzedArrivals = [];
+
+    // 처음 버튼을 누른 시점 또는 '아직 대기 중'을 누른 시점의 인원으로 다시 예측한다.
+    // 먼저 오는 버스에 앞사람들이 탔다고 보고 남은 기준 인원을 다음 버스에 이어서 적용한다.
+    int remainingPeople = waitingCountAtStart;
+    bool foundRecommendation = false;
+
+    for (int i = 0; i < arrivals.length; i++) {
+      final Map<String, dynamic> bus = arrivals[i];
+
+      if (excludedBusKey != null && _predictionBusKey(bus) == excludedBusKey) {
+        analyzedArrivals.add({
+          ...bus,
+          'capacityText': '이전 예상 버스',
+          'statusText': '탑승하지 않음',
+          'isRecommended': false,
+        });
+        continue;
+      }
+
+      final int? capacity = _getBusBoardingCapacityForStation(stationName, bus);
+      final String capacityText = _getCapacityTextForStation(
+        stationName,
+        bus,
+        capacity,
+      );
+
+      if (foundRecommendation) {
+        analyzedArrivals.add({
+          ...bus,
+          'capacityText': capacityText,
+          'statusText': '추천 버스 이후 도착',
+          'isRecommended': false,
+        });
+        continue;
+      }
+
+      if (capacity == null || capacity <= 0) {
+        analyzedArrivals.add({
+          ...bus,
+          'capacityText': capacityText,
+          'statusText': '판단 불가',
+          'isRecommended': false,
+        });
+        continue;
+      }
+
+      if (remainingPeople <= capacity) {
+        recommendedBus = {
+          ...bus,
+          'arrivalOrder': i + 1,
+          'capacityText': capacityText,
+          'ruleText': _getRuleTextForStation(stationName, bus),
+          'statusText': '탑승 가능 예상',
+          'isRecommended': true,
+        };
+
+        analyzedArrivals.add(recommendedBus);
+        foundRecommendation = true;
+      } else {
+        analyzedArrivals.add({
+          ...bus,
+          'capacityText': capacityText,
+          'statusText': '탑승 어려움',
+          'isRecommended': false,
+        });
+
+        remainingPeople -= capacity;
+      }
+    }
+
+    return {
+      'stationName': stationName,
+      'waitingCountAtStart': waitingCountAtStart,
+      'recommendedBus': recommendedBus,
+      'arrivals': analyzedArrivals,
+      'usesRealtimeWaitingCount': stationName == '정문',
+    };
+  }
+
+  int? _getBusBoardingCapacityForStation(
+      String stationName,
+      Map<String, dynamic> bus,
+      ) {
+    final String busNumber = bus['busNumber']?.toString() ?? '';
+
+    if (stationName == '전정대') {
+      return predictionCapacity;
+    }
+
+    if (busNumber == '9') {
+      return predictionCapacity;
+    }
+
+    final dynamic remainSeat = bus['remainSeatCnt'];
+    if (remainSeat is int) return remainSeat;
+    if (remainSeat is num) return remainSeat.toInt();
+    return int.tryParse(remainSeat?.toString() ?? '');
+  }
+
+  String _getCapacityTextForStation(
+      String stationName,
+      Map<String, dynamic> bus,
+      int? capacity,
+      ) {
+    final String busNumber = bus['busNumber']?.toString() ?? '';
+
+    if (capacity == null) return '탑승 판단 정보 없음';
+    if (stationName == '전정대') return '탑승 기준 $predictionCapacity명';
+    if (busNumber == '9') return '저상버스 기준 $predictionCapacity명';
+    return '남은 좌석 $capacity석';
+  }
+
+  String _getRuleTextForStation(
+      String stationName,
+      Map<String, dynamic> bus,
+      ) {
+    final String busNumber = bus['busNumber']?.toString() ?? '';
+
+    if (stationName == '전정대') {
+      return '출발 정류장 탑승 기준 30명 내 탑승 가능 예상';
+    }
+    if (busNumber == '9') {
+      return '저상버스 탑승 기준 30명 내 탑승 가능 예상';
+    }
+    return '실시간 남은 좌석 기준 탑승 가능 예상';
+  }
+
+  Future<void> _startBusWaiting() async {
     if (!canSelectTransportMode) return;
 
     if (!hasCurrentBusInfo) {
@@ -477,10 +670,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    /* 기능 테스트가 끝나면 이 GPS 검사를 다시 사용하세요.
     if (!isNearStation) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('정류장 근처에 도착해야 버스를 선택할 수 있어요.'),
+          content: const Text('정류장 근처에 도착해야 버스 줄서기를 이용할 수 있어요.'),
           backgroundColor: const Color(0xFFF59E0B),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -490,12 +684,60 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
+    */
+
+    if (_isOpeningPrediction) return;
 
     setState(() {
-      myWaitingNumberByStation[selectedStation] = waitingCount + 1;
-      transportModeByStation[selectedStation] = TransportMode.bus;
-      activeStation = selectedStation;
+      _isOpeningPrediction = true;
     });
+
+    try {
+      final String stationAtStart = selectedStation;
+      final prediction = await _calculateBoardingPrediction(stationAtStart);
+
+      if (!mounted) return;
+
+      if (prediction == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('탑승 예상 정보를 불러올 수 없습니다.')),
+        );
+        return;
+      }
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BoardingPredictionScreen(
+            stationName: stationAtStart,
+            waitingCountAtStart: prediction['waitingCountAtStart'] as int,
+            recommendedBus:
+            prediction['recommendedBus'] as Map<String, dynamic>?,
+            arrivals: List<Map<String, dynamic>>.from(prediction['arrivals']),
+            usesRealtimeWaitingCount:
+            prediction['usesRealtimeWaitingCount'] == true,
+            onStillWaiting: (previousBus) async {
+              return _calculateBoardingPrediction(
+                stationAtStart,
+                excludedBusKey: _predictionBusKey(previousBus),
+              );
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningPrediction = false;
+        });
+      }
+    }
   }
 
   void _startWalking() {
@@ -574,7 +816,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 summary['congestionLevel'] ?? '정보 없음';
 
             stationData[station]!['congestion'] =
-                reportCount == 0 || congestionLevel == '정보 없음'
+            reportCount == 0 || congestionLevel == '정보 없음'
                 ? '-'
                 : congestionLevel;
           }
@@ -1053,56 +1295,56 @@ class _RecommendationCard extends StatelessWidget {
                   ),
                   child: isBusWaiting
                       ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _InfoLine(label: '탑승 예상', value: boardingEstimate),
-                            const SizedBox(height: 5),
-                            _InfoLine(
-                              label: '버스 도착',
-                              value: arrival,
-                              valueColor: Color(0xFFFFF176),
-                            ),
-                            const SizedBox(height: 5),
-                            _InfoLine(
-                              label: '예상 도착시간',
-                              value: '약 $estimatedArrivalAfterMinute분 후',
-                            ),
-                          ],
-                        )
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _InfoLine(label: '탑승 예상', value: boardingEstimate),
+                      const SizedBox(height: 5),
+                      _InfoLine(
+                        label: '버스 도착',
+                        value: arrival,
+                        valueColor: Color(0xFFFFF176),
+                      ),
+                      const SizedBox(height: 5),
+                      _InfoLine(
+                        label: '예상 도착시간',
+                        value: '약 $estimatedArrivalAfterMinute분 후',
+                      ),
+                    ],
+                  )
                       : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isWalking
-                                  ? '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다'
-                                  : hasBusInfo
-                                  ? arrival == '곧 출발'
-                                        ? '$bus 버스가 곧 도착합니다'
-                                        : '$bus 버스가 $arrival 도착합니다'
-                                  : '오늘 운행 정보가 없습니다',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (!isWalking &&
-                                hasBusInfo &&
-                                hasWheelchairReservation) ...[
-                              const SizedBox(height: 5),
-                              Text(
-                                wheelchairReservationCount > 1
-                                    ? '휠체어 예약자 ${wheelchairReservationCount}명'
-                                    : '휠체어 예약자 있음',
-                                style: const TextStyle(
-                                  color: Color(0xFFFFF176),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ],
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isWalking
+                            ? '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다'
+                            : hasBusInfo
+                            ? arrival == '곧 출발'
+                            ? '$bus 버스가 곧 도착합니다'
+                            : '$bus 버스가 $arrival 도착합니다'
+                            : '오늘 운행 정보가 없습니다',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
+                      ),
+                      if (!isWalking &&
+                          hasBusInfo &&
+                          hasWheelchairReservation) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          wheelchairReservationCount > 1
+                              ? '휠체어 예약자 ${wheelchairReservationCount}명'
+                              : '휠체어 예약자 있음',
+                          style: const TextStyle(
+                            color: Color(0xFFFFF176),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1286,7 +1528,7 @@ class _TransportModeCard extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed:
-                        hasBusInfo && isNearStation && canSelectTransportMode
+                    hasBusInfo && isNearStation && canSelectTransportMode
                         ? onBusTap
                         : null,
                     style: ElevatedButton.styleFrom(
