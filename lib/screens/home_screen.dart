@@ -439,7 +439,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 3,
+            distanceFilter: 0,
           ),
         ).listen((position) {
           if (!mounted) return;
@@ -484,6 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<Map<String, dynamic>?> _calculateBoardingPrediction(
       String stationName, {
         String? excludedBusKey,
+        int? waitingPeopleForCalculation,
       }) async {
     int waitingCountAtStart;
 
@@ -529,7 +530,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 처음 버튼을 누른 시점 또는 '아직 대기 중'을 누른 시점의 인원으로 다시 예측한다.
     // 먼저 오는 버스에 앞사람들이 탔다고 보고 남은 기준 인원을 다음 버스에 이어서 적용한다.
-    int remainingPeople = waitingCountAtStart;
+    int remainingPeople =
+        waitingPeopleForCalculation ?? waitingCountAtStart;
+
     bool foundRecommendation = false;
 
     for (int i = 0; i < arrivals.length; i++) {
@@ -670,7 +673,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    /* 기능 테스트가 끝나면 이 GPS 검사를 다시 사용하세요.
     if (!isNearStation) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -684,7 +686,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-    */
 
     if (_isOpeningPrediction) return;
 
@@ -720,6 +721,12 @@ class _HomeScreenState extends State<HomeScreen> {
               return _calculateBoardingPrediction(
                 stationAtStart,
                 excludedBusKey: _predictionBusKey(previousBus),
+
+                // 정문은 CCTV를 다시 조회해서 최신 대기인원으로 계산한다.
+                // 외대·전정대는 고정 인원 시뮬레이션이므로,
+                // 예상 버스를 놓친 뒤에는 다음 버스를 기다리는 사용자 1명 기준으로 재계산한다.
+                waitingPeopleForCalculation:
+                stationAtStart == '정문' ? null : 1,
               );
             },
           ),
