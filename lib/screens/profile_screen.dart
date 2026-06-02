@@ -1280,7 +1280,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                     _buildTextField(
                                       controller: _startTimeController,
                                       hintText: '예: 09:15',
-                                      keyboardType: TextInputType.datetime,
+                                      keyboardType: TextInputType.text,
                                     ),
                                   ],
                                 ),
@@ -1295,7 +1295,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                     _buildTextField(
                                       controller: _endTimeController,
                                       hintText: '예: 10:45',
-                                      keyboardType: TextInputType.datetime,
+                                      keyboardType: TextInputType.text,
                                     ),
                                   ],
                                 ),
