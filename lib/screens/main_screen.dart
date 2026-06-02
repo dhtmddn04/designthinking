@@ -13,6 +13,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int selectedIndex = 0;
+  int homeRefreshVersion = 0;
 
   int? currentUserId;
   String? currentUsername;
@@ -21,7 +22,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> screens = [
-      HomeScreen(userId: currentUserId),
+      HomeScreen(userId: currentUserId, refreshVersion: homeRefreshVersion),
       ReservationScreen(
         key: ValueKey(currentUserId),
         userId: currentUserId,
@@ -101,6 +102,10 @@ class _MainScreenState extends State<MainScreen> {
       child: InkWell(
         onTap: () {
           setState(() {
+            if (index == 0) {
+              homeRefreshVersion++;
+            }
+
             selectedIndex = index;
           });
         },

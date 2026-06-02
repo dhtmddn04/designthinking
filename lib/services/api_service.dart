@@ -196,6 +196,42 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  static Future<Map<String, dynamic>> getBoardingRecommendation({
+    required int userId,
+    required String stationName,
+    required String reservedTime,
+  }) async {
+    final uri = Uri.parse('$baseUrl/bus/boarding-recommendation').replace(
+      queryParameters: {
+        'userId': userId.toString(),
+        'stationName': stationName,
+        'reservedTime': reservedTime,
+      },
+    );
+
+    final response = await http.get(uri);
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> getBoardingStatus({
+    required String stationName,
+    required String busNumber,
+    required String boardingTime,
+  }) async {
+    final uri = Uri.parse('$baseUrl/reservations/boarding-status').replace(
+      queryParameters: {
+        'stationName': stationName,
+        'busNumber': busNumber,
+        'boardingTime': boardingTime,
+      },
+    );
+
+    final response = await http.get(uri);
+
+    return jsonDecode(response.body);
+  }
+
   static Future<Map<String, dynamic>> getWaitingCount({
     required String stationName,
   }) async {

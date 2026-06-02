@@ -24,6 +24,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
   bool get _isWeekend {
     final now = DateTime.now();
+
     return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
     //return false;
   }
@@ -68,6 +69,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
 
     return reservationTime.isBefore(now);
+  }
+
+  bool _hasMyReservationAtSameTime(String time) {
+    return myReservedTimesByStop.values.contains(time);
   }
 
   Future<void> _loadReservations() async {
@@ -298,6 +303,29 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
+  void _showAlreadyHasSameTimeReservationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            '예약 불가',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          content: const Text('이미 같은 시간에 다른 정류장 예약이 있습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showNotAllowedDialog() {
     showDialog(
       context: context,
@@ -365,6 +393,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
       return;
     }
 
+    if (_hasMyReservationAtSameTime(time)) {
+      _showAlreadyHasSameTimeReservationDialog();
+      return;
+    }
+
     try {
       final result = await ApiService.createReservation(
         userId: widget.userId!,
@@ -426,9 +459,58 @@ class _ReservationScreenState extends State<ReservationScreen> {
     }
   }
 
-  void _showTicketBottomSheet(String time) {
+  String _formatBoardingBusInfo(Map<String, dynamic> recommendation) {
+    final boardingTime = recommendation['boardingTime'];
+    final expectedArrivalTime = recommendation['expectedArrivalTime'];
+    final departureTime = recommendation['departureTime'];
+
+    final time = boardingTime ?? expectedArrivalTime ?? departureTime;
+
+    if (time != null) {
+      return '9번 저상버스 ($time 예정)';
+    }
+
+    return '9번 저상버스';
+  }
+
+  Future<void> _showTicketBottomSheet(String time) async {
     final stop = selectedStop ?? '정문';
-    const busInfo = '9번 저상버스 (8:35 도착)';
+
+    Map<String, dynamic> recommendation;
+
+    try {
+      final userId = widget.userId;
+
+      if (userId == null) {
+        recommendation = {
+          'success': false,
+          'available': false,
+          'message': '로그인이 필요합니다.',
+        };
+      } else {
+        recommendation = await ApiService.getBoardingRecommendation(
+          userId: userId,
+          stationName: stop,
+          reservedTime: time,
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+
+      recommendation = {
+        'success': false,
+        'available': false,
+        'message': '9번 저상버스 도착정보를 불러올 수 없습니다.',
+      };
+    }
+
+    if (!context.mounted) return;
+
+    final bool available = recommendation['available'] == true;
+
+    final String busInfo = available
+        ? _formatBoardingBusInfo(recommendation)
+        : recommendation['message'] ?? '9번 저상버스 도착정보가 아직 없습니다.';
 
     showModalBottomSheet(
       context: context,
@@ -499,7 +581,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
                     const SizedBox(height: 12),
 
-                    _ticketInfoBox(label: '이용 버스', value: busInfo),
+                    _ticketInfoBox(label: '이용 버스', value: busInfo, valueFontSize: 13),
 
                     const SizedBox(height: 12),
 
@@ -583,7 +665,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
-  Widget _ticketInfoBox({required String label, required String value}) {
+  Widget _ticketInfoBox({
+    required String label,
+    required String value,
+    double valueFontSize = 16,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -605,9 +691,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: valueFontSize,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -664,6 +750,15 @@ class _ReservationScreenState extends State<ReservationScreen> {
               final bool isMyReservation = myReservedTime == time;
               final bool hasMyReservationAtStop = myReservedTime != null;
 
+              final bool hasMyReservationAtSameTime = myReservedTimesByStop
+                  .entries
+                  .any((entry) {
+                    final stopName = entry.key;
+                    final reservedTime = entry.value;
+
+                    return stopName != selectedStop && reservedTime == time;
+                  });
+
               final bool isOccupied =
                   occupiedTimesByStop[selectedStop]?.contains(time) ?? false;
 
@@ -675,6 +770,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   _isWeekend ||
                   isPastTime ||
                   isReservedByOther ||
+                  hasMyReservationAtSameTime ||
                   (hasMyReservationAtStop && !isMyReservation);
 
               return Container(
@@ -719,6 +815,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
                               if (isReservedByOther) {
                                 _showAlreadyReservedDialog();
+                                return;
+                              }
+
+                              if (hasMyReservationAtSameTime) {
+                                _showAlreadyHasSameTimeReservationDialog();
                                 return;
                               }
 
@@ -774,8 +875,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           height: 34,
                           child: ElevatedButton(
                             onPressed: isMyReservation && !isPastTime
-                                ? () {
-                                    _showTicketBottomSheet(time);
+                                ? () async {
+                                    await _showTicketBottomSheet(time);
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(
