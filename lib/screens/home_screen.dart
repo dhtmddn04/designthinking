@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import 'boarding_prediction_screen.dart';
+import 'route_recommendation.dart';
 
 enum TransportMode { none, bus, walk }
 
@@ -20,20 +21,39 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String selectedStation = '정문';
 
-  // GPS
   StreamSubscription<Position>? _positionSubscription;
   Position? _currentPosition;
   bool _locationPermissionGranted = false;
 
-  // 각 정류장의 실제 GPS 좌표 (위도, 경도)
-  // TODO: 실제 정류장 좌표로 교체 필요
   static const Map<String, Map<String, double>> stationCoordinates = {
-    '정문': {'lat': 37.24752, 'lng': 127.0779},
+    '정문': {'lat': 37.2475167, 'lng': 127.0779039},
     '외대': {'lat': 37.24512, 'lng': 127.078460},
     '전정대': {'lat': 37.24051, 'lng': 127.0825},
   };
 
-  static const double nearStationThresholdMeters = 20.0;
+  static const Map<String, Map<String, double>> destinationCoordinates = {
+    '공학관': {'lat': 37.2464962, 'lng': 127.0808592},
+    '외국어대학관': {'lat': 37.245336, 'lng': 127.077709},
+    '체육대학관': {'lat': 37.244540, 'lng': 127.080433},
+    '멀티미디어교육관': {'lat': 37.244515, 'lng': 127.076807},
+    '생명과학대학관': {'lat': 37.242943, 'lng': 127.081077},
+    '전자정보대학관': {'lat': 37.239821, 'lng': 127.083287},
+    '예술디자인대학관': {'lat': 37.241641, 'lng': 127.084424},
+    '국제학관': {'lat': 37.239856, 'lng': 127.081200},
+  };
+
+  static const Map<String, String> buildingToStation = {
+    '공학관': '전정대',
+    '외국어대학관': '외대',
+    '체육대학관': '전정대',
+    '멀티미디어교육관': '외대',
+    '생명과학대학관': '전정대',
+    '전자정보대학관': '전정대',
+    '예술디자인대학관': '외대',
+    '국제학관': '정문',
+  };
+
+  static const double nearStationThresholdMeters = 50.0;
 
   String? activeStation;
   Timer? _congestionTimer;
@@ -42,10 +62,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _waitingCountTimer;
   bool _isOpeningPrediction = false;
 
-
   List<Map<String, dynamic>> _schedules = [];
   String _classTimeText = '-';
   String _nextClassText = '-';
+  int? _nextClassRemainMinute;
+  String? _nextClassBuilding;
 
   final Map<String, TransportMode> transportModeByStation = {
     '정문': TransportMode.none,
@@ -60,15 +81,13 @@ class _HomeScreenState extends State<HomeScreen> {
   };
 
   Map<String, int> waitingCountByStation = {};
-
   static const int busCapacity = 40;
-
   final List<String> stations = ['정문', '외대', '전정대'];
 
-  // 추후 실시간 버스 API 연결
   final Map<String, Map<String, dynamic>> stationData = {
     '정문': {
       'recommend': '버스',
+      'reason': '',
       'bus': '1112번',
       'arrival': '3분 후',
       'arrivalMinute': 3,
@@ -83,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
     },
     '외대': {
       'recommend': '도보',
+      'reason': '',
       'bus': '1112번',
       'arrival': '5분 후',
       'arrivalMinute': 5,
@@ -93,10 +113,11 @@ class _HomeScreenState extends State<HomeScreen> {
       'hasBusInfo': true,
       'classTime': '12분',
       'congestion': '혼잡',
-      'waiting': 73,
+      'waiting': 20,
     },
     '전정대': {
       'recommend': '버스',
+      'reason': '',
       'bus': '1112번',
       'arrival': '7분 후',
       'arrivalMinute': 7,
@@ -107,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'hasBusInfo': true,
       'classTime': '18분',
       'congestion': '약간 혼잡',
-      'waiting': 45,
+      'waiting': 40,
     },
   };
 
@@ -127,12 +148,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
       if (_isWeekend) {
         _applyWeekendNoBusInfo(selectedStation);
         return;
       }
-
       if (selectedStation == '전정대') {
         _loadJeonjeongdaeBusTimetable();
       } else if (selectedStation == '정문' || selectedStation == '외대') {
@@ -146,7 +165,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _waitingCountTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _loadWaitingCount();
     });
-
     _scheduleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       _updateNextClassText();
     });
@@ -155,7 +173,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _applyWeekendNoBusInfo(selectedStation);
         return;
       }
-
       if (selectedStation == '전정대') {
         _loadJeonjeongdaeBusTimetable();
       } else if (selectedStation == '정문' || selectedStation == '외대') {
@@ -166,30 +183,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int? _parseTimeToMinute(String? text) {
     if (text == null) return null;
-
     final parts = text.trim().split(':');
     if (parts.length != 2) return null;
-
     final hour = int.tryParse(parts[0]);
     final minute = int.tryParse(parts[1]);
-
     if (hour == null || minute == null) return null;
-
     return hour * 60 + minute;
   }
 
   String _formatRemainTime(int minute) {
-    if (minute < 60) {
-      return '$minute분';
-    }
-
+    if (minute < 60) return '$minute분';
     final hour = minute ~/ 60;
     final remainingMinute = minute % 60;
-
-    if (remainingMinute == 0) {
-      return '$hour시간';
-    }
-
+    if (remainingMinute == 0) return '$hour시간';
     return '$hour시간 $remainingMinute분';
   }
 
@@ -203,15 +209,13 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _classTimeText = '-';
         _nextClassText = '-';
+        _nextClassRemainMinute = null;
+        _nextClassBuilding = null;
       });
       return;
     }
 
     final now = DateTime.now();
-
-    // 테스트용 현재 시각이 필요할 때만 아래처럼 임시로 변경
-    // final now = DateTime(2026, 6, 2, 10, 17);
-
     final today = _getTodayKorean(now);
     final currentMinute = now.hour * 60 + now.minute;
 
@@ -220,13 +224,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     for (final schedule in _schedules) {
       if (schedule['dayOfWeek'] != today) continue;
-
       final startMinute = _parseTimeToMinute(schedule['startTime']);
       if (startMinute == null) continue;
-
       if (startMinute >= currentMinute) {
         final remain = startMinute - currentMinute;
-
         if (todayRemainMinute == null || remain < todayRemainMinute) {
           todayRemainMinute = remain;
           todayNextSchedule = schedule;
@@ -238,10 +239,11 @@ class _HomeScreenState extends State<HomeScreen> {
       final buildingName = todayNextSchedule['buildingName'] ?? '';
       final roomNumber = todayNextSchedule['roomNumber'] ?? '';
       final startTime = todayNextSchedule['startTime'] ?? '';
-
       setState(() {
         _classTimeText = _formatRemainTime(todayRemainMinute!);
         _nextClassText = '$buildingName $roomNumber · $startTime';
+        _nextClassRemainMinute = todayRemainMinute;
+        _nextClassBuilding = buildingName.toString();
       });
       return;
     }
@@ -249,15 +251,15 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _classTimeText = '-';
       _nextClassText = '-';
+      _nextClassRemainMinute = null;
+      _nextClassBuilding = null;
     });
   }
 
   Future<void> _loadSchedules() async {
     final userId = widget.userId;
-
     if (userId == null) {
       if (!mounted) return;
-
       setState(() {
         _schedules = [];
         _classTimeText = '-';
@@ -265,22 +267,17 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       return;
     }
-
     try {
       final result = await ApiService.getSchedules(userId: userId);
-
       if (!mounted) return;
-
       if (result['success'] == true) {
         setState(() {
           _schedules = List<Map<String, dynamic>>.from(result['schedules']);
         });
-
         _updateNextClassText();
       }
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _schedules = [];
         _classTimeText = '-';
@@ -292,7 +289,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-
     if (oldWidget.userId != widget.userId ||
         oldWidget.refreshVersion != widget.refreshVersion) {
       _loadSchedules();
@@ -310,20 +306,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Map<String, dynamic> get currentData => stationData[selectedStation]!;
-
   bool get hasCurrentBusInfo => currentData['hasBusInfo'] == true;
 
-  // 기존 코드
   bool get _isWeekend {
     final now = DateTime.now();
     return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
-    //return false;
   }
-
-  /* 테스트용 코드(평일)
-  bool get _isWeekend {
-    return false;
-  } */
 
   TransportMode get transportMode =>
       transportModeByStation[selectedStation] ?? TransportMode.none;
@@ -334,72 +322,65 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int? get myWaitingNumber => myWaitingNumberByStation[selectedStation];
 
-  bool get canSelectTransportMode {
-    return activeStation == null || activeStation == selectedStation;
-  }
+  bool get canSelectTransportMode =>
+      activeStation == null || activeStation == selectedStation;
 
-  // 현재 위치와 선택한 정류장 사이 거리를 표시
   String get _locationStatusText {
     if (!_locationPermissionGranted) return '📍 위치 권한이 필요합니다';
     if (_currentPosition == null) return '📍 위치 정보를 가져오는 중...';
-
     final coords = stationCoordinates[selectedStation];
     if (coords == null) return '📍 위치 정보 없음';
-
     final distance = _calculateDistance(
       _currentPosition!.latitude,
       _currentPosition!.longitude,
       coords['lat']!,
       coords['lng']!,
     );
-
     final distanceText = distance < 1000
         ? '${distance.toStringAsFixed(0)}m'
         : '${(distance / 1000).toStringAsFixed(1)}km';
-
     return isNearStation
-        ? '📍 현재 위치: 정류장 근처 ($distanceText · 20m 이내)'
-        : '📍 현재 위치: 정류장까지 $distanceText (20m 이상)';
+        ? '📍 현재 위치: 정류장 근처 ($distanceText · 50m 이내)'
+        : '📍 현재 위치: 정류장까지 $distanceText (50m 이상)';
   }
-/* 테스트용 GPS
-  bool get isNearStation {
-    return true;
-  } */
-
 
   bool get isNearStation {
     if (!_locationPermissionGranted || _currentPosition == null) return false;
-
     final coords = stationCoordinates[selectedStation];
     if (coords == null) return false;
-
     final distance = _calculateDistance(
       _currentPosition!.latitude,
       _currentPosition!.longitude,
       coords['lat']!,
       coords['lng']!,
     );
-
     return distance <= nearStationThresholdMeters;
   }
 
-  double _calculateDistance(
-      double lat1,
-      double lng1,
-      double lat2,
-      double lng2,
-      ) {
+  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
     const earthRadius = 6371000.0;
     final dLat = _toRad(lat2 - lat1);
     final dLng = _toRad(lng2 - lng1);
-    final a =
-        sin(dLat / 2) * sin(dLat / 2) +
-            cos(_toRad(lat1)) * cos(_toRad(lat2)) * sin(dLng / 2) * sin(dLng / 2);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRad(lat1)) * cos(_toRad(lat2)) * sin(dLng / 2) * sin(dLng / 2);
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;
   }
 
   double _toRad(double deg) => deg * pi / 180;
+
+  int? _walkMinutesToDestination() {
+    if (_currentPosition == null) return null;
+    final building = _nextClassBuilding;
+    final dest = (building != null) ? destinationCoordinates[building] : null;
+    if (dest == null) return null;
+    return RouteRecommender.walkMinutesBetween(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      dest['lat']!,
+      dest['lng']!,
+    );
+  }
 
   Future<void> _initLocation() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -409,57 +390,43 @@ class _HomeScreenState extends State<HomeScreen> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
       if (!mounted) return;
-      setState(() {
-        _locationPermissionGranted = false;
-      });
+      setState(() { _locationPermissionGranted = false; });
       return;
     }
 
     if (!mounted) return;
-    setState(() {
-      _locationPermissionGranted = true;
-    });
+    setState(() { _locationPermissionGranted = true; });
 
     try {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
       if (!mounted) return;
-      setState(() {
-        _currentPosition = position;
-      });
+      setState(() { _currentPosition = position; });
     } catch (_) {}
 
-    _positionSubscription =
-        Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 0,
-          ),
-        ).listen((position) {
-          if (!mounted) return;
-          setState(() {
-            _currentPosition = position;
-          });
-        });
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 0,
+      ),
+    ).listen((position) {
+      if (!mounted) return;
+      if (position.accuracy > 50) return;
+      setState(() { _currentPosition = position; });
+    });
   }
 
   void _changeStation(String station) {
-    setState(() {
-      selectedStation = station;
-    });
-
+    setState(() { selectedStation = station; });
     _loadCongestionSummaries();
-
     if (_isWeekend) {
       _applyWeekendNoBusInfo(station);
       return;
     }
-
     if (station == '전정대') {
       _loadJeonjeongdaeBusTimetable();
     } else if (station == '정문' || station == '외대') {
@@ -468,79 +435,47 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   static const int predictionCapacity = 30;
-
-  // 테스트용: 정문 CCTV 대기인원을 고정값으로 가정
-  static const bool useTestMainGateWaitingCount = false;
+  static const bool useTestMainGateWaitingCount = true;
   static const int testMainGateWaitingCount = 20;
-
-  // 경희대로 들어오는 방향: 정문 → 외대
-  // 정문에서는 탑승 가능 공간의 80%까지만 탑승한다고 가정
   static const double mainGateBoardingRatio = 0.8;
 
   String _predictionBusKey(Map<String, dynamic> bus) {
     final plateNo = bus['plateNo']?.toString();
-
-    if (plateNo != null && plateNo.isNotEmpty) {
-      return plateNo;
-    }
-
+    if (plateNo != null && plateNo.isNotEmpty) return plateNo;
     final busNumber = bus['busNumber']?.toString() ?? '';
     final time = bus['expectedArrivalTime']?.toString() ??
-        bus['departureTime']?.toString() ??
-        '';
-
+        bus['departureTime']?.toString() ?? '';
     return '$busNumber|$time';
   }
 
   int? _getBaseBoardingCapacity(Map<String, dynamic> bus) {
     final String busNumber = bus['busNumber']?.toString() ?? '';
-
-    // 9번 저상버스는 좌석 표시 대신 시연용 탑승 기준 30명 사용
-    if (busNumber == '9') {
-      return predictionCapacity;
-    }
-
+    if (busNumber == '9') return predictionCapacity;
     final dynamic remainSeat = bus['remainSeatCnt'];
-
     if (remainSeat is int) return remainSeat;
     if (remainSeat is num) return remainSeat.toInt();
-
     return int.tryParse(remainSeat?.toString() ?? '');
   }
 
   int _getMainGateBoardingLimit(int baseCapacity) {
     if (baseCapacity <= 0) return 0;
-
-    // 예: 30명 공간 × 80% = 정문에서는 최대 24명 탑승
     return max(1, (baseCapacity * mainGateBoardingRatio).floor()).toInt();
   }
 
   Map<String, dynamic>? _findMatchingMainGateBus(
       Map<String, dynamic> oedaeBus,
-      List<Map<String, dynamic>> mainGateArrivals,
-      ) {
+      List<Map<String, dynamic>> mainGateArrivals) {
     final String? oedaePlateNo = oedaeBus['plateNo']?.toString();
-
-    // 같은 실제 차량 번호가 있으면 가장 정확하게 연결
     if (oedaePlateNo != null && oedaePlateNo.isNotEmpty) {
       for (final bus in mainGateArrivals) {
-        if (bus['plateNo']?.toString() == oedaePlateNo) {
-          return bus;
-        }
+        if (bus['plateNo']?.toString() == oedaePlateNo) return bus;
       }
     }
-
-    // 차량 번호가 없는 경우, 같은 노선 버스가 하나뿐일 때만 보조적으로 연결
     final String oedaeBusNumber = oedaeBus['busNumber']?.toString() ?? '';
-
     final sameNumberBuses = mainGateArrivals
         .where((bus) => bus['busNumber']?.toString() == oedaeBusNumber)
         .toList();
-
-    if (sameNumberBuses.length == 1) {
-      return sameNumberBuses.first;
-    }
-
+    if (sameNumberBuses.length == 1) return sameNumberBuses.first;
     return null;
   }
 
@@ -552,24 +487,16 @@ class _HomeScreenState extends State<HomeScreen> {
       }) {
     final String busNumber = bus['busNumber']?.toString() ?? '';
 
-    // 전정대는 학교에서 출발하는 반대 방향이므로 별도 기준 사용
     if (stationName == '전정대') {
       return {
-        // 실제 계산 기준: 버스 한 대당 항상 30명 탑승한다고 가정
         'capacity': predictionCapacity,
-
-        // 화면 표시: 실제 좌석 수와 예측 탑승 인원을 구분
-        'capacityText':
-        '남은 좌석 45석\n전정대 예상 탑승 인원 $predictionCapacity명',
-
+        'capacityText': '남은 좌석 45석\n전정대 예상 탑승 인원 $predictionCapacity명',
         'ruleText': '출발 정류장 예상 탑승 인원 기준 탑승 가능 예상',
       };
     }
 
-    // 정문: 현재 버스 공간의 80%까지만 정문에서 탑승 가능하다고 가정
     if (stationName == '정문') {
       final int? baseCapacity = _getBaseBoardingCapacity(bus);
-
       if (baseCapacity == null) {
         return {
           'capacity': null,
@@ -577,9 +504,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'ruleText': '좌석 정보를 확인할 수 없습니다',
         };
       }
-
       final int mainGateCapacity = _getMainGateBoardingLimit(baseCapacity);
-
       return {
         'capacity': mainGateCapacity,
         'capacityText': busNumber == '9'
@@ -589,11 +514,8 @@ class _HomeScreenState extends State<HomeScreen> {
       };
     }
 
-    // 외대: 정문에서 먼저 탄 사람을 반영한 뒤 남은 공간 100% 사용
     if (stationName == '외대') {
-      final matchingMainGateBus =
-      _findMatchingMainGateBus(bus, mainGateArrivals);
-
+      final matchingMainGateBus = _findMatchingMainGateBus(bus, mainGateArrivals);
       final int? mainGateBaseCapacity = matchingMainGateBus == null
           ? null
           : _getBaseBoardingCapacity(matchingMainGateBus);
@@ -601,29 +523,21 @@ class _HomeScreenState extends State<HomeScreen> {
       if (matchingMainGateBus != null &&
           mainGateBaseCapacity != null &&
           mainGateWaitingCount != null) {
-        final int mainGateLimit =
-        _getMainGateBoardingLimit(mainGateBaseCapacity);
-
+        final int mainGateLimit = _getMainGateBoardingLimit(mainGateBaseCapacity);
         final int predictedBoardingAtMainGate =
-        min(mainGateWaitingCount, mainGateLimit).toInt();
-
+            min(mainGateWaitingCount, mainGateLimit).toInt();
         final int availableAtOedae =
-        max(0, mainGateBaseCapacity - predictedBoardingAtMainGate).toInt();
-
+            max(0, mainGateBaseCapacity - predictedBoardingAtMainGate).toInt();
         return {
           'capacity': availableAtOedae,
           'capacityText': busNumber == '9'
               ? '저상버스 기준 $mainGateBaseCapacity명\n외대 예상 탑승 가능 $availableAtOedae명'
               : '남은 좌석 $mainGateBaseCapacity석\n외대 예상 탑승 가능 $availableAtOedae명',
-          'ruleText':
-          '정문 예상 탑승 $predictedBoardingAtMainGate명 반영 후 탑승 가능 예상',
+          'ruleText': '정문 예상 탑승 $predictedBoardingAtMainGate명 반영 후 탑승 가능 예상',
         };
       }
 
-      // 같은 차량을 정문 목록에서 연결하지 못했을 때 앱이 멈추지 않도록
-      // 외대 실시간 좌석값을 보조 기준으로 사용
       final int? fallbackCapacity = _getBaseBoardingCapacity(bus);
-
       return {
         'capacity': fallbackCapacity,
         'capacityText': fallbackCapacity == null
@@ -649,91 +563,77 @@ class _HomeScreenState extends State<HomeScreen> {
       }) async {
     int waitingCountAtStart;
 
+    final String congestionText =
+        stationData[stationName]?['congestion']?.toString() ?? '-';
+    final int p = RouteRecommender.congestionLevelToIndex(congestionText);
+
     if (stationName == '정문') {
+      int nApp;
       if (useTestMainGateWaitingCount) {
-        // 테스트용: 정문에 사람이 있다고 가정
-        waitingCountAtStart = testMainGateWaitingCount;
+        nApp = testMainGateWaitingCount;
       } else {
-        final waitingResult = await ApiService.getWaitingCount(
-          stationName: '정문',
-        );
-
-        if (waitingResult['success'] != true) {
-          return null;
-        }
-
-        waitingCountAtStart = waitingResult['count'] as int? ?? 0;
+        final waitingResult =
+            await ApiService.getWaitingCount(stationName: '정문');
+        if (waitingResult['success'] != true) return null;
+        nApp = waitingResult['count'] as int? ?? 0;
       }
+      waitingCountAtStart =
+          RouteRecommender.estimateWaitingCount(nApp: nApp, p: p);
     } else {
-      // 외대와 전정대는 프로토타입 시연용 설정값 사용
-      waitingCountAtStart = waitingCountByStation[stationName] ?? 0;
+      // 외대·전정대: 제보 없을 때 기본값 사용
+      const Map<String, int> defaultWaiting = {
+        '외대': 20,
+        '전정대': 40,
+      };
+      waitingCountAtStart = p == 0
+          ? (defaultWaiting[stationName] ?? 0)
+          : RouteRecommender.estimateWaitingCount(nApp: 0, p: p);
     }
 
     Map<String, dynamic> busResult;
-
     if (stationName == '전정대') {
-      busResult = await ApiService.getNextBusTimetable(
-        stationName: stationName,
-      );
+      busResult =
+          await ApiService.getNextBusTimetable(stationName: stationName);
     } else {
-      busResult = await ApiService.getRealtimeNextBus(
-        stationName: stationName,
-      );
+      busResult = await ApiService.getRealtimeNextBus(stationName: stationName);
     }
 
-    if (busResult['success'] != true) {
-      return null;
-    }
+    if (busResult['success'] != true) return null;
 
     final List<dynamic> rawArrivals =
         busResult['arrivals'] as List<dynamic>? ?? [];
+    final List<Map<String, dynamic>> arrivals =
+        rawArrivals.map((bus) => Map<String, dynamic>.from(bus as Map)).toList();
 
-    final List<Map<String, dynamic>> arrivals = rawArrivals
-        .map((bus) => Map<String, dynamic>.from(bus as Map))
-        .toList();
-
-    // 외대 예측일 때는 정문의 CCTV 인원과 정문 버스 목록도 함께 가져온다.
     int? mainGateWaitingCount;
     List<Map<String, dynamic>> mainGateArrivals = [];
 
     if (stationName == '외대') {
       try {
         if (useTestMainGateWaitingCount) {
-          // 테스트용: 외대 계산에 반영할 정문 대기인원
           mainGateWaitingCount = testMainGateWaitingCount;
         } else {
-          final waitingResult = await ApiService.getWaitingCount(
-            stationName: '정문',
-          );
-
+          final waitingResult =
+              await ApiService.getWaitingCount(stationName: '정문');
           if (waitingResult['success'] == true) {
             mainGateWaitingCount = waitingResult['count'] as int? ?? 0;
           }
         }
-
-        final mainGateBusResult = await ApiService.getRealtimeNextBus(
-          stationName: '정문',
-        );
-
+        final mainGateBusResult =
+            await ApiService.getRealtimeNextBus(stationName: '정문');
         if (mainGateBusResult['success'] == true) {
           final List<dynamic> rawMainGateArrivals =
               mainGateBusResult['arrivals'] as List<dynamic>? ?? [];
-
           mainGateArrivals = rawMainGateArrivals
               .map((bus) => Map<String, dynamic>.from(bus as Map))
               .toList();
         }
-      } catch (_) {
-        // 정문 정보 연결 실패 시 외대 자체 실시간 좌석값으로 보조 계산
-      }
+      } catch (_) {}
     }
 
     Map<String, dynamic>? recommendedBus;
     final List<Map<String, dynamic>> analyzedArrivals = [];
-
-    int remainingPeople =
-        waitingPeopleForCalculation ?? waitingCountAtStart;
-
+    int remainingPeople = waitingPeopleForCalculation ?? waitingCountAtStart;
     bool foundRecommendation = false;
 
     for (int i = 0; i < arrivals.length; i++) {
@@ -750,8 +650,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       final Map<String, dynamic> rule = _getBoardingRuleForBus(
-        stationName,
-        bus,
+        stationName, bus,
         mainGateWaitingCount: mainGateWaitingCount,
         mainGateArrivals: mainGateArrivals,
       );
@@ -799,7 +698,6 @@ class _HomeScreenState extends State<HomeScreen> {
           'statusText': '탑승 가능 예상',
           'isRecommended': true,
         };
-
         analyzedArrivals.add(recommendedBus);
         foundRecommendation = true;
       } else {
@@ -809,7 +707,6 @@ class _HomeScreenState extends State<HomeScreen> {
           'statusText': '탑승 어려움',
           'isRecommended': false,
         });
-
         remainingPeople -= capacity;
       }
     }
@@ -823,77 +720,92 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
+  Future<void> _updateRecommendation(String station) async {
+    int? travel;
+    final building = _nextClassBuilding;
+    final destStation = (building != null) ? buildingToStation[building] : null;
+    if (destStation != null) {
+      travel = RouteRecommender.travelMinutesBetween(station, destStation);
+    }
+
+    int? wait;
+    int failedBus = 0;
+    int waitingCount = 0;
+    final prediction = await _calculateBoardingPrediction(station);
+    if (prediction != null) {
+      waitingCount = prediction['waitingCountAtStart'] as int? ?? 0;
+      final rec = prediction['recommendedBus'] as Map<String, dynamic>?;
+      if (rec != null) {
+        wait = (rec['arrivalMinute'] as num?)?.toInt();
+        failedBus = ((rec['arrivalOrder'] as int?) ?? 1) - 1;
+      }
+    }
+
+    final decision = RouteRecommender.decide(
+      waitingCount: waitingCount,
+      failedBusCount: failedBus,
+      waitMinutes: wait,
+      travelMinutes: travel,
+      walkMinutes: _walkMinutesToDestination(),
+      limitMinutes: _nextClassRemainMinute,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      stationData[station]?['recommend'] = decision.isBus ? '버스' : '도보';
+      stationData[station]?['reason'] = decision.reason; // ← reason 저장
+    });
+  }
+
   Future<void> _startBusWaiting() async {
     if (!canSelectTransportMode) return;
-
     if (!hasCurrentBusInfo) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('현재 버스 운행 정보가 없어 줄서기를 이용할 수 없어요.'),
-          backgroundColor: const Color(0xFFF59E0B),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('현재 버스 운행 정보가 없어 줄서기를 이용할 수 없어요.'),
+        backgroundColor: const Color(0xFFF59E0B),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
       return;
     }
-
     if (!isNearStation) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('정류장 근처에 도착해야 버스 줄서기를 이용할 수 있어요.'),
-          backgroundColor: const Color(0xFFF59E0B),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('정류장 근처에 도착해야 버스 줄서기를 이용할 수 있어요.'),
+        backgroundColor: const Color(0xFFF59E0B),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
       return;
     }
-
     if (_isOpeningPrediction) return;
-
-    setState(() {
-      _isOpeningPrediction = true;
-    });
+    setState(() { _isOpeningPrediction = true; });
 
     try {
       final String stationAtStart = selectedStation;
       final prediction = await _calculateBoardingPrediction(stationAtStart);
-
       if (!mounted) return;
-
       if (prediction == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('탑승 예상 정보를 불러올 수 없습니다.')),
         );
         return;
       }
-
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => BoardingPredictionScreen(
             stationName: stationAtStart,
             waitingCountAtStart: prediction['waitingCountAtStart'] as int,
-            recommendedBus:
-            prediction['recommendedBus'] as Map<String, dynamic>?,
+            recommendedBus: prediction['recommendedBus'] as Map<String, dynamic>?,
             arrivals: List<Map<String, dynamic>>.from(prediction['arrivals']),
             usesRealtimeWaitingCount:
-            prediction['usesRealtimeWaitingCount'] == true,
+                prediction['usesRealtimeWaitingCount'] == true,
             onStillWaiting: (previousBus) async {
               return _calculateBoardingPrediction(
                 stationAtStart,
                 excludedBusKey: _predictionBusKey(previousBus),
-
-                // 정문은 CCTV를 다시 조회해서 최신 대기인원으로 계산한다.
-                // 외대·전정대는 고정 인원 시뮬레이션이므로,
-                // 예상 버스를 놓친 뒤에는 다음 버스를 기다리는 사용자 1명 기준으로 재계산한다.
                 waitingPeopleForCalculation:
-                stationAtStart == '정문' ? null : 1,
+                    stationAtStart == '정문' ? null : 1,
               );
             },
           ),
@@ -901,27 +813,20 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isOpeningPrediction = false;
-        });
-      }
+      if (mounted) setState(() { _isOpeningPrediction = false; });
     }
   }
 
   void _startWalking() {
     if (!canSelectTransportMode) return;
-
     setState(() {
       if (transportMode == TransportMode.bus && myWaitingNumber != null) {
         myWaitingNumberByStation[selectedStation] = null;
       }
-
       transportModeByStation[selectedStation] = TransportMode.walk;
       activeStation = selectedStation;
     });
@@ -937,68 +842,61 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int get _estimatedArrivalAfterMinute {
     if (transportMode == TransportMode.walk) {
-      return 15;
+      return _walkMinutesToDestination() ?? 0;
     }
-
     final arrivalMinute = currentData['arrivalMinute'] as int? ?? 0;
-
-    if (myWaitingNumber == null) {
-      return arrivalMinute + 9;
-    }
-
+    if (myWaitingNumber == null) return arrivalMinute + 9;
     final busOrder = (myWaitingNumber! / busCapacity).ceil();
-
-    if (busOrder <= 1) {
-      return arrivalMinute + 9;
-    }
-
+    if (busOrder <= 1) return arrivalMinute + 9;
     return arrivalMinute + 9 + ((busOrder - 1) * 10);
   }
 
   String get _boardingEstimateText {
     if (myWaitingNumber == null) return '다음 버스';
-
     final busOrder = (myWaitingNumber! / busCapacity).ceil();
-
-    if (busOrder <= 1) {
-      return '다음 버스';
-    }
-
+    if (busOrder <= 1) return '다음 버스';
     return '$busOrder번째 버스';
   }
 
   Future<void> _loadCongestionSummaries() async {
     try {
       final result = await ApiService.getOpinionSummaries();
-
       if (!mounted) return;
-
       if (result['success'] == true) {
         final summaries = result['summaries'] as Map<String, dynamic>;
-
         setState(() {
           for (final station in stationData.keys) {
             final summary = summaries[station];
-
             if (summary == null) {
               stationData[station]!['congestion'] = '-';
               continue;
             }
-
             final int reportCount = summary['reportCount'] ?? 0;
-            final String congestionLevel =
-                summary['congestionLevel'] ?? '정보 없음';
-
+            final String congestionLevel = summary['congestionLevel'] ?? '정보 없음';
             stationData[station]!['congestion'] =
-            reportCount == 0 || congestionLevel == '정보 없음'
-                ? '-'
-                : congestionLevel;
+                reportCount == 0 || congestionLevel == '정보 없음'
+                    ? '-'
+                    : congestionLevel;
+
+            if (station != '정문') {
+              final int p = RouteRecommender.congestionLevelToIndex(
+                stationData[station]!['congestion'] as String?,
+              );
+              const Map<String, int> defaultWaiting = {
+                '외대': 20,
+                '전정대': 40,
+              };
+              final int estimated = p == 0
+                  ? (defaultWaiting[station] ?? 0)
+                  : RouteRecommender.estimateWaitingCount(nApp: 0, p: p);
+              waitingCountByStation[station] = estimated;
+              stationData[station]!['waiting'] = estimated;
+            }
           }
         });
       }
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         for (final station in stationData.keys) {
           stationData[station]!['congestion'] = '-';
@@ -1010,40 +908,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadWaitingCount() async {
     if (useTestMainGateWaitingCount) {
       if (!mounted) return;
-
       setState(() {
         waitingCountByStation['정문'] = testMainGateWaitingCount;
         stationData['정문']!['waiting'] = testMainGateWaitingCount;
       });
       return;
     }
-
     try {
       final result = await ApiService.getWaitingCount(stationName: '정문');
-
       if (!mounted) return;
-
       if (result['success'] == true) {
         final int count = result['count'] ?? 0;
         final int currentCount = waitingCountByStation['정문'] ?? 0;
-
-        if (count == currentCount) {
-          return;
-        }
-
+        if (count == currentCount) return;
         setState(() {
           waitingCountByStation['정문'] = count;
           stationData['정문']!['waiting'] = count;
         });
       }
-    } catch (e) {
-      // CCTV 대기인원 조회 실패 시 기존 표시값 유지
-    }
+    } catch (e) {}
   }
 
   void _applyWeekendNoBusInfo(String stationName) {
     setState(() {
       stationData[stationName]!['recommend'] = '도보';
+      stationData[stationName]!['reason'] = '주말에는 버스 운행 정보가 없습니다.';
       stationData[stationName]!['bus'] = '-';
       stationData[stationName]!['arrival'] = '오늘 운행 정보가 없습니다';
       stationData[stationName]!['arrivalMinute'] = 0;
@@ -1052,29 +941,23 @@ class _HomeScreenState extends State<HomeScreen> {
       stationData[stationName]!['hasWheelchairReservation'] = false;
       stationData[stationName]!['wheelchairReservationCount'] = 0;
       stationData[stationName]!['hasBusInfo'] = false;
-
       transportModeByStation[stationName] = TransportMode.none;
       myWaitingNumberByStation[stationName] = null;
-
-      if (activeStation == stationName) {
-        activeStation = null;
-      }
+      if (activeStation == stationName) activeStation = null;
     });
   }
 
   Future<void> _loadJeonjeongdaeBusTimetable() async {
     try {
       final result = await ApiService.getNextBusTimetable(stationName: '전정대');
-
       if (!mounted) return;
-
       if (result['success'] != true) return;
 
       final arrivals = result['arrivals'] as List<dynamic>? ?? [];
-
       if (arrivals.isEmpty) {
         setState(() {
           stationData['전정대']!['recommend'] = '도보';
+          stationData['전정대']!['reason'] = '';
           stationData['전정대']!['bus'] = '-';
           stationData['전정대']!['arrival'] = '오늘 운행 정보가 없습니다';
           stationData['전정대']!['arrivalMinute'] = 0;
@@ -1083,22 +966,16 @@ class _HomeScreenState extends State<HomeScreen> {
           stationData['전정대']!['hasWheelchairReservation'] = false;
           stationData['전정대']!['wheelchairReservationCount'] = 0;
           stationData['전정대']!['hasBusInfo'] = false;
-
           transportModeByStation['전정대'] = TransportMode.none;
           myWaitingNumberByStation['전정대'] = null;
-
-          if (activeStation == '전정대') {
-            activeStation = null;
-          }
+          if (activeStation == '전정대') activeStation = null;
         });
         return;
       }
 
       final firstBus = Map<String, dynamic>.from(arrivals.first as Map);
-
       bool hasWheelchairReservation = false;
       int wheelchairReservationCount = 0;
-
       final firstBusNumber = firstBus['busNumber']?.toString();
       final departureTime = firstBus['departureTime']?.toString();
 
@@ -1109,17 +986,13 @@ class _HomeScreenState extends State<HomeScreen> {
             busNumber: '9',
             boardingTime: departureTime,
           );
-
           if (reservationResult['success'] == true) {
             hasWheelchairReservation =
                 reservationResult['hasWheelchairReservation'] == true;
             wheelchairReservationCount =
                 reservationResult['reservationCount'] as int? ?? 0;
           }
-        } catch (e) {
-          hasWheelchairReservation = false;
-          wheelchairReservationCount = 0;
-        }
+        } catch (e) {}
       }
 
       setState(() {
@@ -1129,32 +1002,25 @@ class _HomeScreenState extends State<HomeScreen> {
         stationData['전정대']!['arrivalMinute'] = firstBus['arrivalMinute'] ?? 0;
         stationData['전정대']!['remainSeatCnt'] = null;
         stationData['전정대']!['crowded'] = null;
-        stationData['전정대']!['hasWheelchairReservation'] =
-            hasWheelchairReservation;
-        stationData['전정대']!['wheelchairReservationCount'] =
-            wheelchairReservationCount;
+        stationData['전정대']!['hasWheelchairReservation'] = hasWheelchairReservation;
+        stationData['전정대']!['wheelchairReservationCount'] = wheelchairReservationCount;
         stationData['전정대']!['hasBusInfo'] = true;
       });
-    } catch (e) {
-      // 네트워크 오류가 나도 홈 화면 전체가 깨지면 안 되므로 기존 전정대 표시값을 유지한다.
-    }
+      _updateRecommendation('전정대');
+    } catch (e) {}
   }
 
   Future<void> _loadRealtimeBusTimetable(String stationName) async {
     try {
-      final result = await ApiService.getRealtimeNextBus(
-        stationName: stationName,
-      );
-
+      final result = await ApiService.getRealtimeNextBus(stationName: stationName);
       if (!mounted) return;
-
       if (result['success'] != true) return;
 
       final arrivals = result['arrivals'] as List<dynamic>? ?? [];
-
       if (arrivals.isEmpty) {
         setState(() {
           stationData[stationName]!['recommend'] = '도보';
+          stationData[stationName]!['reason'] = '';
           stationData[stationName]!['bus'] = '-';
           stationData[stationName]!['arrival'] = '현재 도착 정보가 없습니다';
           stationData[stationName]!['arrivalMinute'] = 0;
@@ -1163,22 +1029,16 @@ class _HomeScreenState extends State<HomeScreen> {
           stationData[stationName]!['hasWheelchairReservation'] = false;
           stationData[stationName]!['wheelchairReservationCount'] = 0;
           stationData[stationName]!['hasBusInfo'] = false;
-
           transportModeByStation[stationName] = TransportMode.none;
           myWaitingNumberByStation[stationName] = null;
-
-          if (activeStation == stationName) {
-            activeStation = null;
-          }
+          if (activeStation == stationName) activeStation = null;
         });
         return;
       }
 
       final firstBus = Map<String, dynamic>.from(arrivals.first as Map);
-
       bool hasWheelchairReservation = false;
       int wheelchairReservationCount = 0;
-
       final firstBusNumber = firstBus['busNumber']?.toString();
       final expectedArrivalTime = firstBus['expectedArrivalTime']?.toString();
 
@@ -1189,45 +1049,34 @@ class _HomeScreenState extends State<HomeScreen> {
             busNumber: '9',
             boardingTime: expectedArrivalTime,
           );
-
           if (reservationResult['success'] == true) {
             hasWheelchairReservation =
                 reservationResult['hasWheelchairReservation'] == true;
             wheelchairReservationCount =
                 reservationResult['reservationCount'] as int? ?? 0;
           }
-        } catch (e) {
-          hasWheelchairReservation = false;
-          wheelchairReservationCount = 0;
-        }
+        } catch (e) {}
       }
 
       setState(() {
         stationData[stationName]!['recommend'] = '버스';
         stationData[stationName]!['bus'] = '${firstBus['busNumber']}번';
         stationData[stationName]!['arrival'] = firstBus['arrival'] ?? '-';
-        stationData[stationName]!['arrivalMinute'] =
-            firstBus['arrivalMinute'] ?? 0;
+        stationData[stationName]!['arrivalMinute'] = firstBus['arrivalMinute'] ?? 0;
         stationData[stationName]!['remainSeatCnt'] = firstBus['remainSeatCnt'];
         stationData[stationName]!['crowded'] = firstBus['crowded'];
-        stationData[stationName]!['hasWheelchairReservation'] =
-            hasWheelchairReservation;
-        stationData[stationName]!['wheelchairReservationCount'] =
-            wheelchairReservationCount;
+        stationData[stationName]!['hasWheelchairReservation'] = hasWheelchairReservation;
+        stationData[stationName]!['wheelchairReservationCount'] = wheelchairReservationCount;
         stationData[stationName]!['hasBusInfo'] = true;
       });
-    } catch (e) {
-      // 실시간 API 실패 시 기존 화면 값을 유지한다.
-    }
+      _updateRecommendation(stationName);
+    } catch (e) {}
   }
 
   @override
   Widget build(BuildContext context) {
     final data = currentData;
-
-    final bool hasWheelchairReservation =
-        data['hasWheelchairReservation'] == true;
-
+    final bool hasWheelchairReservation = data['hasWheelchairReservation'] == true;
     final int wheelchairReservationCount =
         data['wheelchairReservationCount'] as int? ?? 0;
 
@@ -1252,9 +1101,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 '최적의 이동 수단을 추천합니다',
                 style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               ),
-
               const SizedBox(height: 22),
-
               const Text(
                 '정류장 선택',
                 style: TextStyle(
@@ -1264,18 +1111,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-
               Row(
                 children: stations.map((station) {
                   final bool isSelected = selectedStation == station;
-
                   return Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: GestureDetector(
-                        onTap: () {
-                          _changeStation(station);
-                        },
+                        onTap: () => _changeStation(station),
                         child: Container(
                           height: 38,
                           alignment: Alignment.center,
@@ -1306,9 +1149,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 }).toList(),
               ),
-
               const SizedBox(height: 14),
-
               _RecommendationCard(
                 transportMode: transportMode,
                 recommend: data['recommend'] as String,
@@ -1320,8 +1161,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 myWaitingNumber: myWaitingNumber,
                 hasWheelchairReservation: hasWheelchairReservation,
                 wheelchairReservationCount: wheelchairReservationCount,
+                reason: data['reason'] as String? ?? '', // ← reason 전달
               ),
-
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -1356,9 +1197,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
               _TransportModeCard(
                 transportMode: transportMode,
                 station: selectedStation,
@@ -1390,6 +1229,7 @@ class _RecommendationCard extends StatelessWidget {
   final bool hasBusInfo;
   final bool hasWheelchairReservation;
   final int wheelchairReservationCount;
+  final String reason; // ← 추가
 
   const _RecommendationCard({
     required this.transportMode,
@@ -1402,6 +1242,7 @@ class _RecommendationCard extends StatelessWidget {
     required this.myWaitingNumber,
     required this.hasWheelchairReservation,
     required this.wheelchairReservationCount,
+    required this.reason, // ← 추가
   });
 
   @override
@@ -1425,20 +1266,28 @@ class _RecommendationCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              isWalking
-                  ? Icons.directions_walk_rounded
-                  : Icons.directions_bus_filled_rounded,
-              color: Colors.white,
-              size: 23,
-            ),
+          Column(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isWalking || recommend == '도보'
+                      ? Icons.directions_walk_rounded
+                      : Icons.directions_bus_filled_rounded,
+                  color: Colors.white,
+                  size: 23,
+                ),
+              ),
+              if (!isWalking && reason.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _ReasonBadge(reason: reason),
+              ],
+            ],
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1458,7 +1307,9 @@ class _RecommendationCard extends StatelessWidget {
                   isWalking
                       ? '도보 이동을 선택했습니다'
                       : hasBusInfo
-                      ? '$recommend 탑승을 권장합니다'
+                      ? recommend == '버스'
+                          ? '버스 탑승을 권장합니다'
+                          : '도보 이동을 권장합니다'
                       : '도보 이동을 권장합니다',
                   style: const TextStyle(
                     color: Colors.white,
@@ -1469,10 +1320,7 @@ class _RecommendationCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 9,
-                    horizontal: 12,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.14),
                     borderRadius: BorderRadius.circular(10),
@@ -1500,7 +1348,9 @@ class _RecommendationCard extends StatelessWidget {
                     children: [
                       Text(
                         isWalking
-                            ? '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다'
+                            ? (estimatedArrivalAfterMinute == 0
+                            ? '다음 수업이 없습니다.'
+                            : '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다')
                             : hasBusInfo
                             ? arrival == '곧 출발'
                             ? '$bus 버스가 곧 도착합니다'
@@ -1512,9 +1362,7 @@ class _RecommendationCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (!isWalking &&
-                          hasBusInfo &&
-                          hasWheelchairReservation) ...[
+                      if (!isWalking && hasBusInfo && hasWheelchairReservation) ...[
                         const SizedBox(height: 5),
                         Text(
                           wheelchairReservationCount > 1
@@ -1706,13 +1554,11 @@ class _TransportModeCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed:
-                    hasBusInfo && isNearStation && canSelectTransportMode
+                    onPressed: hasBusInfo && isNearStation && canSelectTransportMode
                         ? onBusTap
                         : null,
                     style: ElevatedButton.styleFrom(
@@ -1786,9 +1632,7 @@ class _TransportModeCard extends StatelessWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 18),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
@@ -1906,6 +1750,99 @@ class _TransportModeCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+class _ReasonBadge extends StatefulWidget {
+  final String reason;
+  const _ReasonBadge({required this.reason});
+
+  @override
+  State<_ReasonBadge> createState() => _ReasonBadgeState();
+}
+
+class _ReasonBadgeState extends State<_ReasonBadge> {
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (_) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '추천 이유',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.reason,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      child: const Text(
+                        '확인',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(0.2),
+        ),
+        child: const Center(
+          child: Text(
+            '?',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              height: 1.0,
+            ),
+          ),
+        ),
       ),
     );
   }
