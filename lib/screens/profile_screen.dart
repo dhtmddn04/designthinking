@@ -589,9 +589,10 @@ class _SignupViewState extends State<SignupView> {
 
                   if (username.isEmpty ||
                       password.isEmpty ||
-                      passwordConfirm.isEmpty) {
+                      passwordConfirm.isEmpty ||
+                      phone.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('아이디와 비밀번호를 입력해주세요.')),
+                      const SnackBar(content: Text('모든 정보를 입력해주세요.')),
                     );
                     return;
                   }
