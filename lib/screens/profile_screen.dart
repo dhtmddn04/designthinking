@@ -81,12 +81,15 @@ final List<TimetableEntry> initialTimetable = [
 
 class ProfileScreen extends StatefulWidget {
   final int? userId;
-  final void Function(Map<String, dynamic> user) onLoginSuccess;
-  final VoidCallback onLogoutSuccess;
+  final String? username;
+  final Future<void> Function(Map<String, dynamic> user, bool autoLogin)
+  onLoginSuccess;
+  final Future<void> Function() onLogoutSuccess;
 
   const ProfileScreen({
     super.key,
     required this.userId,
+    required this.username,
     required this.onLoginSuccess,
     required this.onLogoutSuccess,
   });
@@ -96,11 +99,23 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _isLoggedIn = false;
+  late bool _isLoggedIn;
   bool _showSignup = false;
   String _loggedInUser = '';
   //List<TimetableEntry> _timetable = List.from(initialTimetable);
   List<TimetableEntry> _timetable = [];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _isLoggedIn = widget.userId != null;
+    _loggedInUser = widget.username ?? '';
+
+    if (widget.userId != null) {
+      _loadTimetable(widget.userId!);
+    }
+  }
 
   void _login(String username) {
     setState(() {
@@ -109,15 +124,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  void _logout() {
+  Future<void> _logout() async {
+    await widget.onLogoutSuccess();
+
+    if (!mounted) return;
+
     setState(() {
       _isLoggedIn = false;
       _loggedInUser = '';
       _showSignup = false;
       _timetable = [];
     });
-
-    widget.onLogoutSuccess();
   }
 
   void _updateTimetable(List<TimetableEntry> updatedTimetable) {
@@ -193,8 +210,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void didUpdateWidget(covariant ProfileScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.userId != widget.userId && widget.userId != null) {
-      _loadTimetable(widget.userId!);
+    if (oldWidget.userId != widget.userId) {
+      if (widget.userId != null) {
+        setState(() {
+          _isLoggedIn = true;
+          _loggedInUser = widget.username ?? '';
+        });
+
+        _loadTimetable(widget.userId!);
+      } else {
+        setState(() {
+          _isLoggedIn = false;
+          _loggedInUser = '';
+          _showSignup = false;
+          _timetable = [];
+        });
+      }
     }
   }
 
@@ -238,7 +269,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 class LoginView extends StatefulWidget {
   final void Function(String username) onLogin;
-  final void Function(Map<String, dynamic> user) onLoginSuccess;
+  final Future<void> Function(Map<String, dynamic> user, bool autoLogin)
+  onLoginSuccess;
   final VoidCallback onSignup;
 
   const LoginView({
@@ -417,10 +449,10 @@ class _LoginViewState extends State<LoginView> {
                       );
 
                       if (result['success'] == true) {
-                        final user = result['user'];
+                        final user = Map<String, dynamic>.from(result['user']);
 
-                        widget.onLogin(user['username']);
-                        widget.onLoginSuccess(user);
+                        widget.onLogin(user['username']?.toString() ?? '');
+                        await widget.onLoginSuccess(user, _autoLogin);
                       }
                     } catch (e) {
                       if (!context.mounted) return;
@@ -589,9 +621,10 @@ class _SignupViewState extends State<SignupView> {
 
                   if (username.isEmpty ||
                       password.isEmpty ||
-                      passwordConfirm.isEmpty) {
+                      passwordConfirm.isEmpty ||
+                      phone.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('아이디와 비밀번호를 입력해주세요.')),
+                      const SnackBar(content: Text('모든 정보를 입력해주세요.')),
                     );
                     return;
                   }

@@ -7,10 +7,12 @@ const router = express.Router();
 router.post('/signup', async (req, res) => {
   const { username, password, phone, needsWheelchair } = req.body;
 
-  if (!username || !password) {
+  const normalizedPhone = phone?.trim();
+
+  if (!username || !password || !normalizedPhone) {
     return res.status(400).json({
       success: false,
-      message: '아이디와 비밀번호를 입력해주세요.',
+      message: '아이디, 비밀번호, 휴대전화를 모두 입력해주세요.',
     });
   }
 
@@ -34,7 +36,7 @@ router.post('/signup', async (req, res) => {
       INSERT INTO users (username, password_hash, phone, needs_wheelchair)
       VALUES (?, ?, ?, ?)
       `,
-      [username, passwordHash, phone || null, needsWheelchair ? 1 : 0]
+      [username, passwordHash, normalizedPhone, needsWheelchair ? 1 : 0]
     );
 
     return res.status(201).json({
