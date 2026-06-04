@@ -3,7 +3,9 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Android Emulator에서 PC의 localhost로 접근할 때는 10.0.2.2 사용
-  static const String baseUrl = 'http://172.21.27.192:3000/api';
+  //static const String baseUrl = 'http://10.0.2.2:3000/api';
+  static const String baseUrl =
+      'https://pushup-purr-overfull.ngrok-free.dev/api';
 
   static Future<Map<String, dynamic>> signup({
     required String username,
