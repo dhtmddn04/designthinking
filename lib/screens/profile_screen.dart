@@ -927,6 +927,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   ];
 
   int _colorIndex = 0;
+  bool _isAddingClass = false;
 
   @override
   void initState() {
@@ -960,15 +961,46 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     return hour * 60 + minute;
   }
 
+  Future<void> _pickTime(TextEditingController controller) async {
+    final currentMinute = _parseTimeToMinute(controller.text) ?? 9 * 60;
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: currentMinute ~/ 60,
+        minute: currentMinute % 60,
+      ),
+    );
+
+    if (picked == null) return;
+    if (!mounted) return;
+
+    final hourText = picked.hour.toString().padLeft(2, '0');
+    final minuteText = picked.minute.toString().padLeft(2, '0');
+
+    setState(() {
+      controller.text = '$hourText:$minuteText';
+    });
+  }
+
   bool get _canAddClass {
     final startMinute = _parseTimeToMinute(_startTimeController.text);
     final endMinute = _parseTimeToMinute(_endTimeController.text);
 
-    return _selectedDays.isNotEmpty &&
+    return !_isAddingClass &&
+        _selectedDays.isNotEmpty &&
         _roomNumberController.text.trim().isNotEmpty &&
         startMinute != null &&
         endMinute != null &&
         startMinute < endMinute;
+  }
+
+  bool _hasOverlappingClass(String day, int startMinute, int endMinute) {
+    return _timetable.any((entry) {
+      return entry.day == day &&
+          startMinute < entry.endMinute &&
+          endMinute > entry.startMinute;
+    });
   }
 
   Future<void> _loadSchedulesFromServer() async {
@@ -1022,6 +1054,23 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
     if (!_canAddClass || startMinute == null || endMinute == null) return;
 
+    final overlappingDay = _selectedDays.where((day) {
+      return _hasOverlappingClass(day, startMinute, endMinute);
+    }).toList();
+
+    if (overlappingDay.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${overlappingDay.first}요일 같은 시간대에 이미 수업이 있습니다.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isAddingClass = true;
+    });
+
     try {
       for (final day in _selectedDays) {
         final result = await ApiService.addSchedule(
@@ -1064,6 +1113,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAddingClass = false;
+        });
+      }
     }
   }
 
@@ -1313,7 +1368,8 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                     _buildTextField(
                                       controller: _startTimeController,
                                       hintText: '예: 09:15',
-                                      keyboardType: TextInputType.text,
+                                      readOnly: true,
+                                      onTap: () => _pickTime(_startTimeController),
                                     ),
                                   ],
                                 ),
@@ -1328,7 +1384,8 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                     _buildTextField(
                                       controller: _endTimeController,
                                       hintText: '예: 10:45',
-                                      keyboardType: TextInputType.text,
+                                      readOnly: true,
+                                      onTap: () => _pickTime(_endTimeController),
                                     ),
                                   ],
                                 ),
@@ -1431,8 +1488,8 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                   borderRadius: BorderRadius.circular(11),
                                 ),
                               ),
-                              child: const Text(
-                                '수업 추가',
+                              child: Text(
+                                _isAddingClass ? '추가 중...' : '수업 추가',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
@@ -1811,11 +1868,15 @@ Widget _buildTextField({
   required String hintText,
   bool obscureText = false,
   TextInputType keyboardType = TextInputType.text,
+  bool readOnly = false,
+  VoidCallback? onTap,
 }) {
   return TextField(
     controller: controller,
     obscureText: obscureText,
     keyboardType: keyboardType,
+    readOnly: readOnly,
+    onTap: onTap,
     style: const TextStyle(fontSize: 14),
     decoration: InputDecoration(
       hintText: hintText,

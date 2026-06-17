@@ -184,14 +184,14 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       },
                       style: OutlinedButton.styleFrom(
                         backgroundColor: isSelected
-                            ? const Color(0xFF2B7FFF)
+                            ? const Color(0xFF2563EB)
                             : Colors.white,
                         foregroundColor: isSelected
                             ? Colors.white
                             : Colors.black,
                         side: BorderSide(
                           color: isSelected
-                              ? const Color(0xFF2B7FFF)
+                              ? const Color(0xFF2563EB)
                               : const Color(0xFFD1D5DC),
                           width: 1.5,
                         ),
@@ -840,7 +840,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                                   ? const Color(0xFF00C950)
                                   : isDisabled
                                   ? const Color(0xFFE5E7EB)
-                                  : const Color(0xFF2B7FFF),
+                                  : const Color(0xFF2563EB),
                               foregroundColor: isMyReservation || !isDisabled
                                   ? Colors.white
                                   : const Color(0xFF9CA3AF),

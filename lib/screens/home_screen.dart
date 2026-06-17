@@ -1103,13 +1103,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 22),
               const Text(
-                '정류장 선택',
+                '출발 정류장 선택',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF374151),
                 ),
               ),
+
               const SizedBox(height: 10),
               Row(
                 children: stations.map((station) {
@@ -1120,27 +1121,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: GestureDetector(
                         onTap: () => _changeStation(station),
                         child: Container(
-                          height: 38,
+                          height: 44,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? const Color(0xFF2563EB)
                                 : Colors.white,
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(28),
                             border: Border.all(
                               color: isSelected
                                   ? const Color(0xFF2563EB)
-                                  : const Color(0xFFE5E7EB),
+                                  : const Color(0xFFD1D5DC),
+                              width: 1.5,
                             ),
                           ),
                           child: Text(
                             station,
                             style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                               color: isSelected
                                   ? Colors.white
-                                  : const Color(0xFF374151),
+                                  : Colors.black,
                             ),
                           ),
                         ),
@@ -1349,8 +1351,8 @@ class _RecommendationCard extends StatelessWidget {
                       Text(
                         isWalking
                             ? (estimatedArrivalAfterMinute == 0
-                            ? '다음 수업이 없습니다.'
-                            : '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다')
+                            ? '다음 수업 정보가 없어\n예상 도보 시간을 계산할 수 없어요.'
+                            : '다음 수업 건물까지 걸어서 약 $estimatedArrivalAfterMinute분 걸려요.')
                             : hasBusInfo
                             ? arrival == '곧 출발'
                             ? '$bus 버스가 곧 도착합니다'
@@ -1588,7 +1590,7 @@ class _TransportModeCard extends StatelessWidget {
                             !hasBusInfo
                                 ? '현재 이용 불가'
                                 : isNearStation
-                                ? '정류장 근처 확인됨'
+                                ? '내 탑승 예상 확인'
                                 : '정류장 근처에서만',
                             style: const TextStyle(
                               fontSize: 10,
@@ -1621,10 +1623,17 @@ class _TransportModeCard extends StatelessWidget {
                           Icon(Icons.directions_walk_rounded),
                           SizedBox(height: 5),
                           Text(
-                            '도보',
+                            '도보 이동',
                             style: TextStyle(fontWeight: FontWeight.w900),
                           ),
-                          SizedBox(height: 16),
+                          SizedBox(height: 3),
+                          Text(
+                            '예상 도보 시간 확인',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ),

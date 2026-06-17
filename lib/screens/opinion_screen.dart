@@ -62,8 +62,8 @@ class _OpinionScreenState extends State<OpinionScreen>
   Timer? _summaryTimer;
 
   // ── 테마 색상 ────────────────────────────────
-  static const Color _primary = Color(0xFF3B82F6);
-  static const Color _barColor = Color(0xFF3B82F6);
+  static const Color _primary = Color(0xFF2563EB);
+  static const Color _barColor = Color(0xFF2563EB);
   static const Color _barBg = Color(0xFFE5E7EB);
   static const Color _textDark = Color(0xFF111827);
   static const Color _textGray = Color(0xFF6B7280);
@@ -292,7 +292,7 @@ class _OpinionScreenState extends State<OpinionScreen>
             child: const Text(
               '확인',
               style: TextStyle(
-                color: Color(0xFF3B82F6),
+                color: Color(0xFF2563EB),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -634,7 +634,7 @@ class _OpinionScreenState extends State<OpinionScreen>
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: value == null
-              ? const Color(0xFF3B82F6)
+              ? const Color(0xFF2563EB)
               : const Color(0xFFD1D5DB),
         ),
       ),

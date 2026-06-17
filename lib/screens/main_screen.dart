@@ -181,7 +181,7 @@ class _MainScreenState extends State<MainScreen> {
             _buildNavItem(
               index: 2,
               icon: Icons.chat_bubble_outline,
-              label: '의견',
+              label: '제보',
             ),
             _buildNavItem(index: 3, icon: Icons.person_outline, label: '프로필'),
           ],
@@ -198,7 +198,7 @@ class _MainScreenState extends State<MainScreen> {
     final bool isSelected = selectedIndex == index;
 
     final Color color = isSelected
-        ? const Color(0xFF2B7FFF)
+        ? const Color(0xFF2563EB)
         : const Color(0xFF99A1AF);
 
     return Expanded(

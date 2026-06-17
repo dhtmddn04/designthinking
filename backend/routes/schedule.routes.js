@@ -152,6 +152,31 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const [overlappingSchedules] = await db.query(
+      `
+      SELECT id
+      FROM user_schedules
+      WHERE user_id = ?
+        AND day_of_week = ?
+        AND TIME_TO_SEC(start_time) < TIME_TO_SEC(?)
+        AND TIME_TO_SEC(end_time) > TIME_TO_SEC(?)
+      LIMIT 1
+      `,
+      [
+        userId,
+        normalizedDay,
+        normalizedEndTime,
+        normalizedStartTime,
+      ]
+    );
+
+    if (overlappingSchedules.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: '같은 시간대에 이미 등록된 수업이 있습니다.',
+      });
+    }
+
     await db.query(
       `
       INSERT INTO user_schedules
