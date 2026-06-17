@@ -11,7 +11,8 @@ class TimetableEntry {
   final String day;
   final int startMinute;
   final int endMinute;
-  final String room;
+  final String buildingName;
+  final String roomNumber;
   final Color color;
 
   TimetableEntry({
@@ -19,9 +20,12 @@ class TimetableEntry {
     required this.day,
     required this.startMinute,
     required this.endMinute,
-    required this.room,
+    required this.buildingName,
+    required this.roomNumber,
     required this.color,
   });
+
+  String get room => '$buildingName $roomNumber'.trim();
 }
 
 final List<TimetableEntry> initialTimetable = [
@@ -29,49 +33,56 @@ final List<TimetableEntry> initialTimetable = [
     day: '월',
     startMinute: 9 * 60,
     endMinute: 11 * 60,
-    room: '공학관 301',
+    buildingName: '공학관',
+    roomNumber: '301',
     color: Colors.blue,
   ),
   TimetableEntry(
     day: '월',
     startMinute: 13 * 60,
     endMinute: 16 * 60,
-    room: '본관 201',
+    buildingName: '외국어대학관',
+    roomNumber: '201',
     color: Colors.green,
   ),
   TimetableEntry(
     day: '화',
     startMinute: 10 * 60 + 15,
     endMinute: 12 * 60,
-    room: '공학관 205',
+    buildingName: '멀티미디어교육관',
+    roomNumber: '701',
     color: Colors.purple,
   ),
   TimetableEntry(
     day: '수',
     startMinute: 9 * 60,
     endMinute: 11 * 60,
-    room: '공학관 301',
+    buildingName: '전자정보대학관',
+    roomNumber: 'B04',
     color: Colors.blue,
   ),
   TimetableEntry(
     day: '수',
     startMinute: 14 * 60 + 30,
     endMinute: 16 * 60,
-    room: '중앙도서관 501',
+    buildingName: '체육대학관',
+    roomNumber: '261',
     color: Colors.orange,
   ),
   TimetableEntry(
     day: '목',
     startMinute: 10 * 60,
     endMinute: 12 * 60,
-    room: '공학관 205',
+    buildingName: '전자정보대학관',
+    roomNumber: '111',
     color: Colors.purple,
   ),
   TimetableEntry(
     day: '금',
     startMinute: 13 * 60,
     endMinute: 16 * 60,
-    room: '본관 201',
+    buildingName: '전자정보대학관',
+    roomNumber: '304',
     color: Colors.green,
   ),
 ];
@@ -192,7 +203,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               day: schedule['dayOfWeek'],
               startMinute: startMinute,
               endMinute: endMinute,
-              room: '$buildingName $roomNumber',
+              buildingName: buildingName.toString(),
+              roomNumber: roomNumber.toString(),
               color: colors[index % colors.length],
             );
           }).toList();
@@ -1039,8 +1051,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     Colors.red,
   ];
 
-  int _colorIndex = 0;
   bool _isAddingClass = false;
+
+  int? _editingScheduleId;
+  bool _isUpdatingClass = false;
+
+  bool get _isEditing => _editingScheduleId != null;
 
   @override
   void initState() {
@@ -1183,6 +1199,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     final endMinute = _parseTimeToMinute(_endTimeController.text);
 
     return !_isAddingClass &&
+        !_isUpdatingClass &&
         _selectedDays.isNotEmpty &&
         _roomNumberController.text.trim().isNotEmpty &&
         startMinute != null &&
@@ -1190,8 +1207,17 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
         startMinute < endMinute;
   }
 
-  bool _hasOverlappingClass(String day, int startMinute, int endMinute) {
+  bool _hasOverlappingClass(
+      String day,
+      int startMinute,
+      int endMinute, {
+        int? exceptScheduleId,
+      }) {
     return _timetable.any((entry) {
+      if (exceptScheduleId != null && entry.id == exceptScheduleId) {
+        return false;
+      }
+
       return entry.day == day &&
           startMinute < entry.endMinute &&
           endMinute > entry.startMinute;
@@ -1225,13 +1251,140 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
           day: schedule['dayOfWeek'],
           startMinute: startMinute,
           endMinute: endMinute,
-          room: '$buildingName $roomNumber',
+          buildingName: buildingName.toString(),
+          roomNumber: roomNumber.toString(),
           color: _colors[index % _colors.length],
         );
       }).toList();
     });
 
     widget.onSave(_timetable);
+  }
+
+  void _resetClassForm() {
+    setState(() {
+      _editingScheduleId = null;
+      _selectedDays.clear();
+      _startTimeController.text = '09:00';
+      _endTimeController.text = '10:00';
+      _roomNumberController.clear();
+      _selectedBuilding = '공학관';
+    });
+  }
+
+  void _startEditClass(int index) {
+    final entry = _timetable[index];
+
+    if (entry.id == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('수정할 시간표 정보를 찾을 수 없습니다.')));
+      return;
+    }
+
+    setState(() {
+      _editingScheduleId = entry.id;
+
+      _selectedDays
+        ..clear()
+        ..add(entry.day);
+
+      _startTimeController.text = _formatMinute(entry.startMinute);
+      _endTimeController.text = _formatMinute(entry.endMinute);
+      _selectedBuilding = entry.buildingName;
+      _roomNumberController.text = entry.roomNumber;
+    });
+  }
+
+  Future<void> _updateClass() async {
+    final userId = widget.userId;
+    final scheduleId = _editingScheduleId;
+
+    if (userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      return;
+    }
+
+    if (scheduleId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('수정할 시간표를 선택해주세요.')));
+      return;
+    }
+
+    final startMinute = _parseTimeToMinute(_startTimeController.text);
+    final endMinute = _parseTimeToMinute(_endTimeController.text);
+
+    if (!_canAddClass || startMinute == null || endMinute == null) return;
+
+    if (_selectedDays.length != 1) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('수정할 요일은 하나만 선택해주세요.')));
+      return;
+    }
+
+    final selectedDay = _selectedDays.first;
+
+    final hasOverlap = _hasOverlappingClass(
+      selectedDay,
+      startMinute,
+      endMinute,
+      exceptScheduleId: scheduleId,
+    );
+
+    if (hasOverlap) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$selectedDay요일 같은 시간대에 이미 수업이 있습니다.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdatingClass = true;
+    });
+
+    try {
+      final result = await ApiService.updateSchedule(
+        userId: userId,
+        scheduleId: scheduleId,
+        dayOfWeek: selectedDay,
+        startTime: _startTimeController.text.trim(),
+        endTime: _endTimeController.text.trim(),
+        buildingName: _selectedBuilding,
+        roomNumber: _roomNumberController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        await _loadSchedulesFromServer();
+
+        _resetClassForm();
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('시간표가 수정되었습니다.')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? '시간표 수정에 실패했습니다.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingClass = false;
+        });
+      }
+    }
   }
 
   Future<void> _addClass() async {
@@ -1291,13 +1444,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
       await _loadSchedulesFromServer();
 
-      setState(() {
-        _selectedDays.clear();
-        _startTimeController.text = '09:00';
-        _endTimeController.text = '10:00';
-        _roomNumberController.clear();
-        _selectedBuilding = '공학관';
-      });
+      _resetClassForm();
 
       ScaffoldMessenger.of(
         context,
@@ -1497,7 +1644,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                     const SizedBox(height: 16),
 
                     _sectionCard(
-                      title: '수업 추가',
+                      title: _isEditing ? '수업 수정' : '수업 추가',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1512,6 +1659,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 child: GestureDetector(
                                   onTap: () {
                                     setState(() {
+                                      if (_isEditing) {
+                                        _selectedDays
+                                          ..clear()
+                                          ..add(day);
+                                        return;
+                                      }
+
                                       if (selected) {
                                         _selectedDays.remove(day);
                                       } else {
@@ -1668,7 +1822,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _canAddClass ? _addClass : null,
+                              onPressed: _canAddClass
+                                  ? (_isEditing ? _updateClass : _addClass)
+                                  : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2563EB),
                                 disabledBackgroundColor: const Color(
@@ -1687,7 +1843,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 ),
                               ),
                               child: Text(
-                                _isAddingClass ? '추가 중...' : '수업 추가',
+                                _isUpdatingClass
+                                    ? '수정 중...'
+                                    : _isAddingClass
+                                      ? '추가 중...'
+                                      : _isEditing
+                                        ? '수정 완료'
+                                        : '수업 추가',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
@@ -1695,6 +1857,22 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                               ),
                             ),
                           ),
+                          if (_isEditing) ...[
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: TextButton(
+                                onPressed: _resetClassForm,
+                                child: const Text(
+                                  '수정 취소',
+                                  style: TextStyle(
+                                    color: Color(0xFF6B7280),
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1761,6 +1939,26 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                       ],
                                     ),
                                   ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      _startEditClass(index);
+                                    },
+                                    child: Container(
+                                      width: 30,
+                                      height: 30,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      child: const Icon(
+                                        Icons.edit_outlined,
+                                        color: Color(0xFF2563EB),
+                                        size: 17,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 8),
 
                                   GestureDetector(
                                     onTap: () {

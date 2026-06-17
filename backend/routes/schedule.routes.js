@@ -207,6 +207,166 @@ router.post('/', async (req, res) => {
   }
 });
 
+// 시간표 수정
+router.put('/:scheduleId', async (req, res) => {
+  const { scheduleId } = req.params;
+
+  const {
+    userId,
+    dayOfWeek,
+    startTime,
+    endTime,
+    buildingName,
+    roomNumber,
+  } = req.body;
+
+  const normalizedDay = dayOfWeek?.trim();
+  const normalizedStartTime = startTime?.trim();
+  const normalizedEndTime = endTime?.trim();
+  const normalizedBuildingName = buildingName?.trim();
+  const normalizedRoomNumber = roomNumber?.trim();
+
+  if (
+    !userId ||
+    !normalizedDay ||
+    !normalizedStartTime ||
+    !normalizedEndTime ||
+    !normalizedBuildingName ||
+    !normalizedRoomNumber
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: '시간표 정보를 모두 입력해주세요.',
+    });
+  }
+
+  if (!allowedDays.includes(normalizedDay)) {
+    return res.status(400).json({
+      success: false,
+      message: '올바르지 않은 요일입니다.',
+    });
+  }
+
+  if (!allowedBuildings.includes(normalizedBuildingName)) {
+    return res.status(400).json({
+      success: false,
+      message: '올바르지 않은 강의 건물입니다.',
+    });
+  }
+
+  if (!isValidTime(normalizedStartTime) || !isValidTime(normalizedEndTime)) {
+    return res.status(400).json({
+      success: false,
+      message: '시간 형식이 올바르지 않습니다.',
+    });
+  }
+
+  if (timeToMinute(normalizedStartTime) >= timeToMinute(normalizedEndTime)) {
+    return res.status(400).json({
+      success: false,
+      message: '종료 시간은 시작 시간보다 늦어야 합니다.',
+    });
+  }
+
+  try {
+    const [users] = await db.query(
+      `
+      SELECT id
+      FROM users
+      WHERE id = ?
+      `,
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '사용자를 찾을 수 없습니다.',
+      });
+    }
+
+    const [existingSchedules] = await db.query(
+      `
+      SELECT id
+      FROM user_schedules
+      WHERE id = ?
+        AND user_id = ?
+      LIMIT 1
+      `,
+      [scheduleId, userId]
+    );
+
+    if (existingSchedules.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '수정할 시간표를 찾을 수 없습니다.',
+      });
+    }
+
+    const [overlappingSchedules] = await db.query(
+      `
+      SELECT id
+      FROM user_schedules
+      WHERE user_id = ?
+        AND day_of_week = ?
+        AND id != ?
+        AND TIME_TO_SEC(start_time) < TIME_TO_SEC(?)
+        AND TIME_TO_SEC(end_time) > TIME_TO_SEC(?)
+      LIMIT 1
+      `,
+      [
+        userId,
+        normalizedDay,
+        scheduleId,
+        normalizedEndTime,
+        normalizedStartTime,
+      ]
+    );
+
+    if (overlappingSchedules.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: '같은 시간대에 이미 등록된 수업이 있습니다.',
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE user_schedules
+      SET
+        day_of_week = ?,
+        start_time = ?,
+        end_time = ?,
+        building_name = ?,
+        room_number = ?
+      WHERE id = ?
+        AND user_id = ?
+      `,
+      [
+        normalizedDay,
+        normalizedStartTime,
+        normalizedEndTime,
+        normalizedBuildingName,
+        normalizedRoomNumber,
+        scheduleId,
+        userId,
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: '시간표가 수정되었습니다.',
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: '시간표 수정 중 서버 오류가 발생했습니다.',
+    });
+  }
+});
+
 // 시간표 삭제
 router.delete('/:scheduleId', async (req, res) => {
   const { scheduleId } = req.params;
