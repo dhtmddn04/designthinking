@@ -1269,6 +1269,7 @@ class _RecommendationCard extends StatelessWidget {
       child: Row(
         children: [
           Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 width: 42,
@@ -1285,8 +1286,9 @@ class _RecommendationCard extends StatelessWidget {
                   size: 23,
                 ),
               ),
+
               if (!isWalking && reason.isNotEmpty) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
                 _ReasonBadge(reason: reason),
               ],
             ],
@@ -1789,7 +1791,7 @@ class _ReasonBadgeState extends State<_ReasonBadge> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    '추천 이유',
+                    '이동 수단 추천 기준',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -1835,8 +1837,8 @@ class _ReasonBadgeState extends State<_ReasonBadge> {
         );
       },
       child: Container(
-        width: 22,
-        height: 22,
+        width: 25,
+        height: 25,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white.withOpacity(0.2),
@@ -1846,7 +1848,7 @@ class _ReasonBadgeState extends State<_ReasonBadge> {
             '?',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
               height: 1.0,
             ),
