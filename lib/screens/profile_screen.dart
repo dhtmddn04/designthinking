@@ -1074,7 +1074,10 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     return hour * 60 + minute;
   }
 
-  Future<void> _pickTime(TextEditingController controller) async {
+  Future<void> _pickTime(
+      TextEditingController controller, {
+        bool isStartTime = false,
+      }) async {
     final currentMinute = _parseTimeToMinute(controller.text) ?? 9 * 60;
 
     final now = DateTime.now();
@@ -1117,13 +1120,30 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                     const Spacer(),
                     TextButton(
                       onPressed: () {
-                        final hourText =
-                        selectedTime.hour.toString().padLeft(2, '0');
-                        final minuteText =
-                        selectedTime.minute.toString().padLeft(2, '0');
+                        final pickedMinute = selectedTime.hour * 60 + selectedTime.minute;
+
+                        final hourText = selectedTime.hour.toString().padLeft(2, '0');
+                        final minuteText = selectedTime.minute.toString().padLeft(2, '0');
 
                         setState(() {
                           controller.text = '$hourText:$minuteText';
+
+                          // 시작 시간을 고른 경우,
+                          // 종료 시간이 시작 시간보다 빠르거나 같으면 자동으로 시작 + 1시간으로 보정
+                          if (isStartTime) {
+                            final currentEndMinute = _parseTimeToMinute(_endTimeController.text);
+
+                            if (currentEndMinute == null || currentEndMinute <= pickedMinute) {
+                              int adjustedEndMinute = pickedMinute + 60;
+
+                              // 23:55를 넘어가지 않도록 제한
+                              if (adjustedEndMinute > 23 * 60 + 55) {
+                                adjustedEndMinute = 23 * 60 + 55;
+                              }
+
+                              _endTimeController.text = _formatMinute(adjustedEndMinute);
+                            }
+                          }
                         });
 
                         Navigator.pop(context);
@@ -1544,7 +1564,10 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                       controller: _startTimeController,
                                       hintText: '예: 09:15',
                                       readOnly: true,
-                                      onTap: () => _pickTime(_startTimeController),
+                                      onTap: () => _pickTime(
+                                        _startTimeController,
+                                        isStartTime: true,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1846,176 +1869,299 @@ class TimetableGrid extends StatelessWidget {
   const TimetableGrid({super.key, required this.timetable});
 
   static const List<String> _days = ['월', '화', '수', '목', '금'];
-  static const List<int> _hours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 
-  static const double _timeColumnWidth = 24;
-  static const double _dayColumnWidth = 48;
-  static const double _rowHeight = 32;
+  // 기본 표시 범위: 09:00 ~ 18:00
+  static const int _defaultStartHour = 9;
+  static const int _defaultEndHour = 18;
+
+  // 표 크기 조정
+  // 기존 dayColumnWidth가 48이라 너무 좁았으므로 70으로 넓힘
+  static const double _timeColumnWidth = 38;
+  static const double _dayColumnWidth = 70;
+  static const double _rowHeight = 42;
   static const double _gap = 2;
+
+  int get _visibleStartHour {
+    if (timetable.isEmpty) return _defaultStartHour;
+
+    int minStartMinute = timetable.first.startMinute;
+
+    for (final entry in timetable) {
+      if (entry.startMinute < minStartMinute) {
+        minStartMinute = entry.startMinute;
+      }
+    }
+
+    final classStartHour = minStartMinute ~/ 60;
+
+    // 기본은 9시부터 보여주되, 9시 이전 수업이 있으면 그 시간까지 확장
+    final result = classStartHour < _defaultStartHour
+        ? classStartHour
+        : _defaultStartHour;
+
+    // 0시보다 작아지는 예외 방지
+    return result < 0 ? 0 : result;
+  }
+
+  int get _visibleEndHour {
+    if (timetable.isEmpty) return _defaultEndHour;
+
+    int maxEndMinute = timetable.first.endMinute;
+
+    for (final entry in timetable) {
+      if (entry.endMinute > maxEndMinute) {
+        maxEndMinute = entry.endMinute;
+      }
+    }
+
+    // 예: 18:00이면 18, 18:10이면 19까지 표시
+    int classEndHour = maxEndMinute ~/ 60;
+    if (maxEndMinute % 60 != 0) {
+      classEndHour += 1;
+    }
+
+    final result = classEndHour > _defaultEndHour
+        ? classEndHour
+        : _defaultEndHour;
+
+    // 하루 최대 24시까지만 표시
+    return result > 24 ? 24 : result;
+  }
+
+  List<int> get _visibleHours {
+    final startHour = _visibleStartHour;
+    final endHour = _visibleEndHour;
+
+    if (endHour <= startHour) {
+      return [_defaultStartHour];
+    }
+
+    return List.generate(
+      endHour - startHour,
+          (index) => startHour + index,
+    );
+  }
+
+  String _formatHourLabel(int hour) {
+    return hour.toString().padLeft(2, '0');
+  }
+
+  String _shortRoomName(String room) {
+    // 시간표 칸이 좁으므로 긴 건물명은 약칭으로 줄여 표시
+    return room
+        .replaceAll('외국어대학관', '외대')
+        .replaceAll('멀티미디어교육관', '멀관')
+        .replaceAll('생명과학대학관', '생대')
+        .replaceAll('전자정보대학관', '전정대')
+        .replaceAll('예술디자인대학관', '예대')
+        .replaceAll('체육대학관', '체대')
+        .replaceAll('국제학관', '국제대');
+  }
 
   @override
   Widget build(BuildContext context) {
+    final visibleHours = _visibleHours;
+    final int timetableStartMinute = _visibleStartHour * 60;
+    final int timetableEndMinute = _visibleEndHour * 60;
+
     final double gridWidth =
         _timeColumnWidth + (_dayColumnWidth + _gap) * _days.length;
 
-    return Center(
-      child: SizedBox(
-        width: gridWidth,
-        child: Column(
-          children: [
-            Row(
-              children: [
-                const SizedBox(width: _timeColumnWidth),
-                ..._days.map((day) {
-                  return SizedBox(
-                    width: _dayColumnWidth,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: _gap / 2),
-                      padding: const EdgeInsets.symmetric(vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        day,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF374151),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double viewportWidth = constraints.maxWidth;
 
-            const SizedBox(height: 5),
-
-            Stack(
-              children: [
-                Column(
-                  children: _hours.map((hour) {
-                    return Row(
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: gridWidth < viewportWidth ? viewportWidth : gridWidth,
+            child: Center(
+              child: SizedBox(
+                width: gridWidth,
+                child: Column(
+                  children: [
+                    // 요일 헤더
+                    Row(
                       children: [
-                        SizedBox(
-                          width: _timeColumnWidth,
-                          height: _rowHeight,
-                          child: Center(
-                            child: Text(
-                              '$hour',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Color(0xFF9CA3AF),
-                              ),
-                            ),
-                          ),
-                        ),
+                        const SizedBox(width: _timeColumnWidth),
                         ..._days.map((day) {
-                          final int cellStart = hour * 60;
-                          final int cellEnd = (hour + 1) * 60;
-
-                          final bool isOccupied = timetable.any((entry) {
-                            return entry.day == day &&
-                                entry.startMinute < cellEnd &&
-                                entry.endMinute > cellStart;
-                          });
-
-                          return Container(
-                            width: _dayColumnWidth,
-                            height: _rowHeight,
-                            margin: const EdgeInsets.all(_gap / 2),
-                            decoration: BoxDecoration(
-                              color: isOccupied
-                                  ? Colors.transparent
-                                  : const Color(0xFFF9FAFB),
-                              border: Border.all(
-                                color: isOccupied
-                                    ? Colors.transparent
-                                    : const Color(0xFFE5E7EB),
+                          return SizedBox(
+                            width: _dayColumnWidth + _gap,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: _gap / 2,
                               ),
-                              borderRadius: BorderRadius.circular(4),
+                              padding: const EdgeInsets.symmetric(vertical: 7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                              child: Text(
+                                day,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF374151),
+                                ),
+                              ),
                             ),
                           );
                         }),
                       ],
-                    );
-                  }).toList(),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Stack(
+                      children: [
+                        // 배경 격자
+                        Column(
+                          children: visibleHours.map((hour) {
+                            return Row(
+                              children: [
+                                SizedBox(
+                                  width: _timeColumnWidth,
+                                  height: _rowHeight + _gap,
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        _formatHourLabel(hour),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF9CA3AF),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                ..._days.map((day) {
+                                  final int cellStart = hour * 60;
+                                  final int cellEnd = (hour + 1) * 60;
+
+                                  final bool isOccupied = timetable.any((entry) {
+                                    return entry.day == day &&
+                                        entry.startMinute < cellEnd &&
+                                        entry.endMinute > cellStart;
+                                  });
+
+                                  return Container(
+                                    width: _dayColumnWidth,
+                                    height: _rowHeight,
+                                    margin: const EdgeInsets.all(_gap / 2),
+                                    decoration: BoxDecoration(
+                                      color: isOccupied
+                                          ? Colors.transparent
+                                          : const Color(0xFFF9FAFB),
+                                      border: Border.all(
+                                        color: isOccupied
+                                            ? Colors.transparent
+                                            : const Color(0xFFE5E7EB),
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+
+                        // 수업 블록
+                        ..._days.asMap().entries.expand((dayEntry) {
+                          final int dayIndex = dayEntry.key;
+                          final String day = dayEntry.value;
+
+                          return timetable
+                              .where((entry) => entry.day == day)
+                              .map((entry) {
+                            // 표시 범위 밖의 수업은 그리지 않음
+                            if (entry.endMinute <= timetableStartMinute ||
+                                entry.startMinute >= timetableEndMinute) {
+                              return const SizedBox.shrink();
+                            }
+
+                            // 표시 범위를 벗어나는 수업은 보이는 구간만 잘라서 표시
+                            final int visibleStart =
+                            entry.startMinute < timetableStartMinute
+                                ? timetableStartMinute
+                                : entry.startMinute;
+
+                            final int visibleEnd =
+                            entry.endMinute > timetableEndMinute
+                                ? timetableEndMinute
+                                : entry.endMinute;
+
+                            final double top =
+                                ((visibleStart - timetableStartMinute) / 60) *
+                                    (_rowHeight + _gap);
+
+                            final double left = _timeColumnWidth +
+                                dayIndex * (_dayColumnWidth + _gap);
+
+                            final double calculatedHeight =
+                                ((visibleEnd - visibleStart) / 60) *
+                                    (_rowHeight + _gap) -
+                                    _gap;
+
+                            final double blockHeight =
+                            calculatedHeight < 24 ? 24 : calculatedHeight;
+
+                            return Positioned(
+                              top: top,
+                              left: left,
+                              width: _dayColumnWidth,
+                              height: blockHeight,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: _gap / 2,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: entry.color,
+                                  borderRadius: BorderRadius.circular(7),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: entry.color.withOpacity(0.25),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _shortRoomName(entry.room),
+                                    textAlign: TextAlign.center,
+                                    maxLines: blockHeight < 36 ? 1 : 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      height: 1.15,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          });
+                        }),
+                      ],
+                    ),
+                  ],
                 ),
-
-                ..._days.asMap().entries.expand((dayEntry) {
-                  final int dayIndex = dayEntry.key;
-                  final String day = dayEntry.value;
-
-                  return timetable.where((entry) => entry.day == day).map((
-                    entry,
-                  ) {
-                    final int timetableStartMinute = _hours.first * 60;
-                    final int timetableEndMinute = (_hours.last + 1) * 60;
-
-                    if (entry.endMinute <= timetableStartMinute ||
-                        entry.startMinute >= timetableEndMinute) {
-                      return const SizedBox.shrink();
-                    }
-
-                    final int visibleStart =
-                        entry.startMinute < timetableStartMinute
-                        ? timetableStartMinute
-                        : entry.startMinute;
-
-                    final int visibleEnd = entry.endMinute > timetableEndMinute
-                        ? timetableEndMinute
-                        : entry.endMinute;
-
-                    final double top =
-                        ((visibleStart - timetableStartMinute) / 60) *
-                        (_rowHeight + _gap);
-
-                    final double left =
-                        _timeColumnWidth + dayIndex * (_dayColumnWidth + _gap);
-
-                    final double height =
-                        ((visibleEnd - visibleStart) / 60) *
-                            (_rowHeight + _gap) -
-                        _gap;
-
-                    return Positioned(
-                      top: top,
-                      left: left,
-                      width: _dayColumnWidth,
-                      height: height < 20 ? 20 : height,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: _gap / 2,
-                        ),
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: entry.color,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Center(
-                          child: Text(
-                            entry.room,
-                            textAlign: TextAlign.center,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 7,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  });
-                }),
-              ],
+              ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
