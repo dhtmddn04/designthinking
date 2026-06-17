@@ -94,16 +94,22 @@ final List<TimetableEntry> initialTimetable = [
 class ProfileScreen extends StatefulWidget {
   final int? userId;
   final String? username;
+  final String? phone;
+  final bool needsWheelchair;
   final Future<void> Function(Map<String, dynamic> user, bool autoLogin)
   onLoginSuccess;
   final Future<void> Function() onLogoutSuccess;
+  final Future<void> Function(Map<String, dynamic> user) onProfileUpdated;
 
   const ProfileScreen({
     super.key,
     required this.userId,
     required this.username,
+    required this.phone,
+    required this.needsWheelchair,
     required this.onLoginSuccess,
     required this.onLogoutSuccess,
+    required this.onProfileUpdated,
   });
 
   @override
@@ -114,7 +120,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late bool _isLoggedIn;
   bool _showSignup = false;
   String _loggedInUser = '';
-  //List<TimetableEntry> _timetable = List.from(initialTimetable);
+  String _phone = '';
+  bool _needsWheelchair = false;
   List<TimetableEntry> _timetable = [];
 
   @override
@@ -123,6 +130,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     _isLoggedIn = widget.userId != null;
     _loggedInUser = widget.username ?? '';
+    _phone = widget.phone ?? '';
+    _needsWheelchair = widget.needsWheelchair;
 
     if (widget.userId != null) {
       _loadTimetable(widget.userId!);
@@ -144,6 +153,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _isLoggedIn = false;
       _loggedInUser = '';
+      _phone = '';
+      _needsWheelchair = false;
       _showSignup = false;
       _timetable = [];
     });
@@ -153,6 +164,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _timetable = updatedTimetable;
     });
+  }
+
+  Future<void> _handleProfileUpdated(Map<String, dynamic> user) async {
+    setState(() {
+      _loggedInUser = user['username']?.toString() ?? _loggedInUser;
+      _phone = user['phone']?.toString() ?? _phone;
+      _needsWheelchair = user['needsWheelchair'] == true;
+    });
+
+    await widget.onProfileUpdated(user);
   }
 
   int? _parseTimeToMinute(String? text) {
@@ -223,18 +244,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void didUpdateWidget(covariant ProfileScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.userId != widget.userId) {
+    if (oldWidget.userId != widget.userId ||
+        oldWidget.username != widget.username ||
+        oldWidget.phone != widget.phone ||
+        oldWidget.needsWheelchair != widget.needsWheelchair) {
       if (widget.userId != null) {
         setState(() {
           _isLoggedIn = true;
           _loggedInUser = widget.username ?? '';
+          _phone = widget.phone ?? '';
+          _needsWheelchair = widget.needsWheelchair;
         });
 
-        _loadTimetable(widget.userId!);
+        if (oldWidget.userId != widget.userId) {
+          _loadTimetable(widget.userId!);
+        }
       } else {
         setState(() {
           _isLoggedIn = false;
           _loggedInUser = '';
+          _phone = '';
+          _needsWheelchair = false;
           _showSignup = false;
           _timetable = [];
         });
@@ -269,9 +299,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ProfileContentView(
       userId: widget.userId,
       username: _loggedInUser,
+      phone: _phone,
+      needsWheelchair: _needsWheelchair,
       timetable: _timetable,
       onLogout: _logout,
       onTimetableUpdated: _updateTimetable,
+      onProfileUpdated: _handleProfileUpdated,
     );
   }
 }
@@ -818,17 +851,23 @@ class _SignupViewState extends State<SignupView> {
 class ProfileContentView extends StatelessWidget {
   final int? userId;
   final String username;
+  final String phone;
+  final bool needsWheelchair;
   final List<TimetableEntry> timetable;
   final VoidCallback onLogout;
   final void Function(List<TimetableEntry>) onTimetableUpdated;
+  final Future<void> Function(Map<String, dynamic> user) onProfileUpdated;
 
   const ProfileContentView({
     super.key,
     required this.userId,
     required this.username,
+    required this.phone,
+    required this.needsWheelchair,
     required this.timetable,
     required this.onLogout,
     required this.onTimetableUpdated,
+    required this.onProfileUpdated,
   });
 
   @override
@@ -899,6 +938,85 @@ class ProfileContentView extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
                 child: Column(
                   children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                '프로필 정보',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF111827),
+                                ),
+                              ),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: () {
+                                  if (userId == null) return;
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ProfileEditScreen(
+                                        userId: userId!,
+                                        username: username,
+                                        phone: phone,
+                                        needsWheelchair: needsWheelchair,
+                                        onProfileUpdated: onProfileUpdated,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit_outlined,
+                                    color: Color(0xFF2563EB),
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _ProfileInfoRow(label: '아이디', value: username),
+                          const SizedBox(height: 10),
+                          _ProfileInfoRow(
+                            label: '휴대전화',
+                            value: phone.isEmpty ? '등록된 번호 없음' : phone,
+                          ),
+                          const SizedBox(height: 10),
+                          _ProfileInfoRow(
+                            label: '휠체어 탑승 여부',
+                            value: needsWheelchair ? '예' : '아니오',
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
@@ -989,6 +1107,378 @@ class ProfileContentView extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ProfileInfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6B7280),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class ProfileEditScreen extends StatefulWidget {
+  final int userId;
+  final String username;
+  final String phone;
+  final bool needsWheelchair;
+  final Future<void> Function(Map<String, dynamic> user) onProfileUpdated;
+
+  const ProfileEditScreen({
+    super.key,
+    required this.userId,
+    required this.username,
+    required this.phone,
+    required this.needsWheelchair,
+    required this.onProfileUpdated,
+  });
+
+  @override
+  State<ProfileEditScreen> createState() => _ProfileEditScreenState();
+}
+
+class _ProfileEditScreenState extends State<ProfileEditScreen> {
+  late TextEditingController _phoneMiddleController;
+  late TextEditingController _phoneLastController;
+  final FocusNode _phoneLastFocusNode = FocusNode();
+
+  late bool _needsWheelchair;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final parts = widget.phone.split('-');
+
+    _phoneMiddleController = TextEditingController(
+      text: parts.length == 3 ? parts[1] : '',
+    );
+
+    _phoneLastController = TextEditingController(
+      text: parts.length == 3 ? parts[2] : '',
+    );
+
+    _needsWheelchair = widget.needsWheelchair;
+  }
+
+  @override
+  void dispose() {
+    _phoneMiddleController.dispose();
+    _phoneLastController.dispose();
+    _phoneLastFocusNode.dispose();
+    super.dispose();
+  }
+
+  Widget _buildPhonePartField({
+    required TextEditingController controller,
+    required String hintText,
+    FocusNode? focusNode,
+    void Function(String)? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      maxLength: 4,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(4),
+      ],
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        counterText: '',
+        hintText: hintText,
+        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.7),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveProfile() async {
+    final phoneMiddle = _phoneMiddleController.text.trim();
+    final phoneLast = _phoneLastController.text.trim();
+    final phone = '010-$phoneMiddle-$phoneLast';
+
+    if (phoneMiddle.isEmpty || phoneLast.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('휴대전화 번호를 모두 입력해주세요.')),
+      );
+      return;
+    }
+
+    if (phoneMiddle.length != 4 || phoneLast.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('휴대전화 번호는 4자리씩 입력해주세요.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final result = await ApiService.updateProfile(
+        userId: widget.userId,
+        phone: phone,
+        needsWheelchair: _needsWheelchair,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? '프로필 수정 결과를 확인할 수 없습니다.'),
+        ),
+      );
+
+      if (result['success'] == true) {
+        final user = Map<String, dynamic>.from(result['user']);
+
+        await widget.onProfileUpdated(user);
+
+        if (!mounted) return;
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          '프로필 수정',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF111827),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 24, 22, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('아이디'),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                ),
+                child: Text(
+                  widget.username,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              _buildLabel('휴대전화'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 70,
+                    height: 49,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                    ),
+                    child: const Text(
+                      '010',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '-',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPhonePartField(
+                      controller: _phoneMiddleController,
+                      hintText: '1234',
+                      onChanged: (value) {
+                        if (value.length == 4) {
+                          _phoneLastFocusNode.requestFocus();
+                        }
+                      },
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '-',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPhonePartField(
+                      controller: _phoneLastController,
+                      hintText: '5678',
+                      focusNode: _phoneLastFocusNode,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              _buildLabel('휠체어 탑승 여부'),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildToggleButton(
+                      label: '예',
+                      selected: _needsWheelchair,
+                      onTap: () {
+                        setState(() {
+                          _needsWheelchair = true;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildToggleButton(
+                      label: '아니오',
+                      selected: !_needsWheelchair,
+                      onTap: () {
+                        setState(() {
+                          _needsWheelchair = false;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 28),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF93C5FD),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    _isSaving ? '저장 중...' : '수정 완료',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

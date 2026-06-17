@@ -40,6 +40,23 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  static Future<Map<String, dynamic>> updateProfile({
+    required int userId,
+    required String phone,
+    required bool needsWheelchair,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/auth/profile/$userId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phone': phone,
+        'needsWheelchair': needsWheelchair,
+      }),
+    );
+
+    return jsonDecode(response.body);
+  }
+
   static Future<Map<String, dynamic>> createReservation({
     required int userId,
     required String stopName,

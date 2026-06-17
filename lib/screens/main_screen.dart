@@ -17,6 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   static const String _autoLoginKey = 'autoLogin';
   static const String _userIdKey = 'userId';
   static const String _usernameKey = 'username';
+  static const String _phoneKey = 'phone';
   static const String _needsWheelchairKey = 'needsWheelchair';
 
   final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
@@ -27,6 +28,7 @@ class _MainScreenState extends State<MainScreen> {
 
   int? currentUserId;
   String? currentUsername;
+  String? currentPhone;
   bool currentNeedsWheelchair = false;
 
   bool _isRestoringLogin = true;
@@ -42,6 +44,7 @@ class _MainScreenState extends State<MainScreen> {
       final bool autoLogin = await _prefs.getBool(_autoLoginKey) ?? false;
       final int? savedUserId = await _prefs.getInt(_userIdKey);
       final String? savedUsername = await _prefs.getString(_usernameKey);
+      final String? savedPhone = await _prefs.getString(_phoneKey);
       final bool savedNeedsWheelchair =
           await _prefs.getBool(_needsWheelchairKey) ?? false;
 
@@ -51,6 +54,7 @@ class _MainScreenState extends State<MainScreen> {
         if (autoLogin && savedUserId != null && savedUsername != null) {
           currentUserId = savedUserId;
           currentUsername = savedUsername;
+          currentPhone = savedPhone;
           currentNeedsWheelchair = savedNeedsWheelchair;
 
           // 자동 로그인 상태면 홈 탭으로 시작
@@ -58,6 +62,7 @@ class _MainScreenState extends State<MainScreen> {
         } else {
           currentUserId = null;
           currentUsername = null;
+          currentPhone = null;
           currentNeedsWheelchair = false;
 
           // 자동 로그인 상태가 아니면 프로필 탭으로 시작
@@ -70,6 +75,10 @@ class _MainScreenState extends State<MainScreen> {
       if (!mounted) return;
 
       setState(() {
+        currentUserId = null;
+        currentUsername = null;
+        currentPhone = null;
+        currentNeedsWheelchair = false;
         selectedIndex = 3;
         _isRestoringLogin = false;
       });
@@ -80,6 +89,7 @@ class _MainScreenState extends State<MainScreen> {
     await _prefs.remove(_autoLoginKey);
     await _prefs.remove(_userIdKey);
     await _prefs.remove(_usernameKey);
+    await _prefs.remove(_phoneKey);
     await _prefs.remove(_needsWheelchairKey);
   }
 
@@ -89,12 +99,14 @@ class _MainScreenState extends State<MainScreen> {
       ) async {
     final int userId = user['id'] as int;
     final String username = user['username']?.toString() ?? '';
+    final String phone = user['phone']?.toString() ?? '';
     final bool needsWheelchair = user['needsWheelchair'] == true;
 
     if (autoLogin) {
       await _prefs.setBool(_autoLoginKey, true);
       await _prefs.setInt(_userIdKey, userId);
       await _prefs.setString(_usernameKey, username);
+      await _prefs.setString(_phoneKey, phone);
       await _prefs.setBool(_needsWheelchairKey, needsWheelchair);
     } else {
       await _clearStoredLogin();
@@ -105,6 +117,29 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       currentUserId = userId;
       currentUsername = username;
+      currentPhone = phone;
+      currentNeedsWheelchair = needsWheelchair;
+    });
+  }
+
+  Future<void> _handleProfileUpdated(Map<String, dynamic> user) async {
+    final String username = user['username']?.toString() ?? currentUsername ?? '';
+    final String phone = user['phone']?.toString() ?? '';
+    final bool needsWheelchair = user['needsWheelchair'] == true;
+
+    final bool autoLogin = await _prefs.getBool(_autoLoginKey) ?? false;
+
+    if (autoLogin) {
+      await _prefs.setString(_usernameKey, username);
+      await _prefs.setString(_phoneKey, phone);
+      await _prefs.setBool(_needsWheelchairKey, needsWheelchair);
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      currentUsername = username;
+      currentPhone = phone;
       currentNeedsWheelchair = needsWheelchair;
     });
   }
@@ -117,6 +152,7 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       currentUserId = null;
       currentUsername = null;
+      currentPhone = null;
       currentNeedsWheelchair = false;
       selectedIndex = 3;
     });
@@ -144,19 +180,28 @@ class _MainScreenState extends State<MainScreen> {
         userId: currentUserId,
         needsWheelchair: currentNeedsWheelchair,
       ),
-      OpinionScreen(key: ValueKey(currentUserId), userId: currentUserId),
+      OpinionScreen(
+        key: ValueKey(currentUserId),
+        userId: currentUserId,
+      ),
       ProfileScreen(
         userId: currentUserId,
         username: currentUsername,
+        phone: currentPhone,
+        needsWheelchair: currentNeedsWheelchair,
         onLoginSuccess: _handleLoginSuccess,
         onLogoutSuccess: _handleLogoutSuccess,
+        onProfileUpdated: _handleProfileUpdated,
       ),
     ];
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: IndexedStack(index: selectedIndex, children: screens),
+        child: IndexedStack(
+          index: selectedIndex,
+          children: screens,
+        ),
       ),
       bottomNavigationBar: Container(
         height: 72,
@@ -171,12 +216,19 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ],
           border: Border(
-            top: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+            top: BorderSide(
+              color: Color(0xFFE5E7EB),
+              width: 1,
+            ),
           ),
         ),
         child: Row(
           children: [
-            _buildNavItem(index: 0, icon: Icons.home_outlined, label: '홈'),
+            _buildNavItem(
+              index: 0,
+              icon: Icons.home_outlined,
+              label: '홈',
+            ),
             _buildNavItem(
               index: 1,
               icon: Icons.event_available_outlined,
@@ -187,7 +239,11 @@ class _MainScreenState extends State<MainScreen> {
               icon: Icons.chat_bubble_outline,
               label: '제보',
             ),
-            _buildNavItem(index: 3, icon: Icons.person_outline, label: '프로필'),
+            _buildNavItem(
+              index: 3,
+              icon: Icons.person_outline,
+              label: '프로필',
+            ),
           ],
         ),
       ),
@@ -202,18 +258,18 @@ class _MainScreenState extends State<MainScreen> {
     final bool isSelected = selectedIndex == index;
 
     final Color color = isSelected
-        ? const Color(0xFF2563EB)
+        ? const Color(0xFF2B7FFF)
         : const Color(0xFF99A1AF);
 
     return Expanded(
       child: InkWell(
         onTap: () {
           setState(() {
+            selectedIndex = index;
+
             if (index == 0) {
               homeRefreshVersion++;
             }
-
-            selectedIndex = index;
           });
         },
         splashColor: Colors.transparent,
@@ -221,7 +277,11 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 26, color: color),
+            Icon(
+              icon,
+              size: 26,
+              color: color,
+            ),
             const SizedBox(height: 2),
             Text(
               label,
