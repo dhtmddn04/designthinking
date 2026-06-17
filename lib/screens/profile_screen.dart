@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
-
 // ─────────────────────────────────────────────
 // 데이터 모델
 // ─────────────────────────────────────────────
@@ -1077,23 +1077,85 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   Future<void> _pickTime(TextEditingController controller) async {
     final currentMinute = _parseTimeToMinute(controller.text) ?? 9 * 60;
 
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(
-        hour: currentMinute ~/ 60,
-        minute: currentMinute % 60,
-      ),
+    final now = DateTime.now();
+
+    DateTime selectedTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      currentMinute ~/ 60,
+      currentMinute % 60,
     );
 
-    if (picked == null) return;
-    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SizedBox(
+          height: 300,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        '취소',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        final hourText =
+                        selectedTime.hour.toString().padLeft(2, '0');
+                        final minuteText =
+                        selectedTime.minute.toString().padLeft(2, '0');
 
-    final hourText = picked.hour.toString().padLeft(2, '0');
-    final minuteText = picked.minute.toString().padLeft(2, '0');
+                        setState(() {
+                          controller.text = '$hourText:$minuteText';
+                        });
 
-    setState(() {
-      controller.text = '$hourText:$minuteText';
-    });
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        '완료',
+                        style: TextStyle(
+                          color: Color(0xFF2563EB),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  use24hFormat: true,
+                  minuteInterval: 5,
+                  initialDateTime: selectedTime,
+                  onDateTimeChanged: (DateTime value) {
+                    selectedTime = value;
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   bool get _canAddClass {
