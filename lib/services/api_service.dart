@@ -40,6 +40,23 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  static Future<Map<String, dynamic>> updateProfile({
+    required int userId,
+    required String phone,
+    required bool needsWheelchair,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/auth/profile/$userId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phone': phone,
+        'needsWheelchair': needsWheelchair,
+      }),
+    );
+
+    return jsonDecode(response.body);
+  }
+
   static Future<Map<String, dynamic>> createReservation({
     required int userId,
     required String stopName,
@@ -142,6 +159,31 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/schedules'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'userId': userId,
+        'dayOfWeek': dayOfWeek,
+        'startTime': startTime,
+        'endTime': endTime,
+        'buildingName': buildingName,
+        'roomNumber': roomNumber,
+      }),
+    );
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> updateSchedule({
+    required int userId,
+    required int scheduleId,
+    required String dayOfWeek,
+    required String startTime,
+    required String endTime,
+    required String buildingName,
+    required String roomNumber,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/schedules/$scheduleId'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'userId': userId,

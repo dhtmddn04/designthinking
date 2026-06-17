@@ -8,11 +8,27 @@ import 'route_recommendation.dart';
 
 enum TransportMode { none, bus, walk }
 
+class BusRouteOption {
+  final int travelMinutes;
+  final String routeText;
+
+  const BusRouteOption({
+    required this.travelMinutes,
+    required this.routeText,
+  });
+}
+
 class HomeScreen extends StatefulWidget {
   final int? userId;
   final int refreshVersion;
+  final bool isActive;
 
-  const HomeScreen({super.key, required this.userId, this.refreshVersion = 0});
+  const HomeScreen({
+    super.key,
+    required this.userId,
+    this.refreshVersion = 0,
+    this.isActive = true,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -42,16 +58,141 @@ class _HomeScreenState extends State<HomeScreen> {
     '국제학관': {'lat': 37.239856, 'lng': 127.081200},
   };
 
-  static const Map<String, String> buildingToStation = {
-    '공학관': '전정대',
-    '외국어대학관': '외대',
-    '체육대학관': '전정대',
-    '멀티미디어교육관': '외대',
-    '생명과학대학관': '전정대',
-    '전자정보대학관': '전정대',
-    '예술디자인대학관': '외대',
-    '국제학관': '정문',
+  static const Map<String, List<String>> walkingOnlyBuildingsByStation = {
+    '정문': [
+      '공학관',
+    ],
+    '외대': [
+      '외국어대학관',
+      '멀티미디어교육관',
+    ],
+    '전정대': [
+      '전자정보대학관',
+      '예술디자인대학관',
+      '국제학관',
+    ],
   };
+
+  static const Map<String, Map<String, BusRouteOption>>
+  busRouteOptionsByStationAndBuilding = {
+    // 교내 진입 방향: 정문 → 외대 → 생대1 → 사색의 광장
+    '정문': {
+      '외국어대학관': BusRouteOption(
+        travelMinutes: 1,
+        routeText: '외대 정류장 하차',
+      ),
+
+      // 정문 → 외대 정류장 1분 + 외대 정류장 → 멀관 도보 3분
+      '멀티미디어교육관': BusRouteOption(
+        travelMinutes: 4,
+        routeText: '외대 정류장 하차 후 도보 3분',
+      ),
+
+      '생명과학대학관': BusRouteOption(
+        travelMinutes: 3,
+        routeText: '생대1 정류장 하차',
+      ),
+
+      // 정문 → 사색의 광장 5분 + 사색의 광장 → 전정대 도보 3분
+      '전자정보대학관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '사색의 광장 하차 후 도보 3분',
+      ),
+
+      // 정문 → 사색의 광장 5분 + 사색의 광장 → 예대 도보 4분
+      '예술디자인대학관': BusRouteOption(
+        travelMinutes: 9,
+        routeText: '사색의 광장 하차 후 도보 4분',
+      ),
+
+      // 정문 → 사색의 광장 5분 + 사색의 광장 → 국제대 도보 3분
+      '국제학관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '사색의 광장 하차 후 도보 3분',
+      ),
+
+      // 정문 → 체대는 외대에서 내려 걸어가는 우회 경로
+      // 정확한 도보 시간이 정해지면 8을 수정하면 됨
+      '체육대학관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '외대 정류장 하차 후 도보',
+      ),
+
+      // 정문 → 공학관은 넣지 않음
+      // walkingOnlyBuildingsByStation에서 무조건 도보 처리
+    },
+
+    // 외대 출발: 외대/멀관은 walkingOnly에서 도보 처리
+    '외대': {
+      '생명과학대학관': BusRouteOption(
+        travelMinutes: 2,
+        routeText: '생대1 정류장 하차',
+      ),
+
+      // 외대 → 사색의 광장 4분 + 사색의 광장 → 전정대 도보 3분
+      '전자정보대학관': BusRouteOption(
+        travelMinutes: 7,
+        routeText: '사색의 광장 하차 후 도보 3분',
+      ),
+
+      // 외대 → 사색의 광장 4분 + 사색의 광장 → 예대 도보 4분
+      '예술디자인대학관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '사색의 광장 하차 후 도보 4분',
+      ),
+
+      // 외대 → 사색의 광장 4분 + 사색의 광장 → 국제대 도보 3분
+      '국제학관': BusRouteOption(
+        travelMinutes: 7,
+        routeText: '사색의 광장 하차 후 도보 3분',
+      ),
+    },
+
+    // 교내 나가는 방향: 전정대 → 생대2 → 체대
+    '전정대': {
+      '생명과학대학관': BusRouteOption(
+        travelMinutes: 2,
+        routeText: '생대2 정류장 하차',
+      ),
+
+      '체육대학관': BusRouteOption(
+        travelMinutes: 4,
+        routeText: '체대 정류장 하차',
+      ),
+
+      // 전정대 → 체대 4분 + 체대 → 공학관 도보 5분
+      '공학관': BusRouteOption(
+        travelMinutes: 9,
+        routeText: '체대 정류장 하차 후 도보 5분',
+      ),
+
+      // 전정대 → 외대/멀관은 체대에서 내려 걸어가는 우회 경로
+      // 아직 정확한 도보 시간이 없으면 기존 추정값 유지
+      '외국어대학관': BusRouteOption(
+        travelMinutes: 9,
+        routeText: '체대 정류장 하차 후 도보',
+      ),
+
+      '멀티미디어교육관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '체대 정류장 하차 후 도보',
+      ),
+    },
+  };
+
+  bool _isWalkingOnlyBuilding({
+    required String station,
+    required String building,
+  }) {
+    return walkingOnlyBuildingsByStation[station]?.contains(building) == true;
+  }
+
+  BusRouteOption? _busRouteOptionToBuilding({
+    required String station,
+    required String building,
+  }) {
+    return busRouteOptionsByStationAndBuilding[station]?[building];
+  }
 
   static const double nearStationThresholdMeters = 50.0;
 
@@ -61,6 +202,69 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _busTimetableTimer;
   Timer? _waitingCountTimer;
   bool _isOpeningPrediction = false;
+
+  // ──────────────────────────────────────────────
+  // 원터치 혼잡도 제보
+  // ──────────────────────────────────────────────
+  static const List<_QuickCongestionOption> _quickReportOptions = [
+    _QuickCongestionOption(
+      level: '여유',
+      label: '여유',
+      icon: Icons.sentiment_very_satisfied_rounded,
+      bgColor: Color(0xFFECFDF5),
+      borderColor: Color(0xFFA7F3D0),
+      iconBgColor: Color(0xFFD1FAE5),
+      iconColor: Color(0xFF10B981),
+      textColor: Color(0xFF047857),
+      dotColor: Color(0xFF34D399),
+    ),
+    _QuickCongestionOption(
+      level: '보통',
+      label: '보통',
+      icon: Icons.sentiment_satisfied_alt_rounded,
+      bgColor: Color(0xFFEFF6FF),
+      borderColor: Color(0xFFBFDBFE),
+      iconBgColor: Color(0xFFDBEAFE),
+      iconColor: Color(0xFF2563EB),
+      textColor: Color(0xFF1D4ED8),
+      dotColor: Color(0xFF60A5FA),
+    ),
+    _QuickCongestionOption(
+      level: '약간 혼잡',
+      label: '약간 혼잡',
+      icon: Icons.sentiment_neutral_rounded,
+      bgColor: Color(0xFFFFFBEB),
+      borderColor: Color(0xFFFDE68A),
+      iconBgColor: Color(0xFFFEF3C7),
+      iconColor: Color(0xFFF59E0B),
+      textColor: Color(0xFFB45309),
+      dotColor: Color(0xFFFBBF24),
+    ),
+    _QuickCongestionOption(
+      level: '혼잡',
+      label: '혼잡',
+      icon: Icons.sentiment_very_dissatisfied_rounded,
+      bgColor: Color(0xFFFEF2F2),
+      borderColor: Color(0xFFFECACA),
+      iconBgColor: Color(0xFFFEE2E2),
+      iconColor: Color(0xFFEF4444),
+      textColor: Color(0xFFB91C1C),
+      dotColor: Color(0xFFF87171),
+    ),
+  ];
+
+  static const Duration _quickReportCooldown = Duration(minutes: 5);
+
+// 사용자별 마지막 원터치 제보 시간
+  static final Map<int, DateTime> _lastQuickReportedAtByUser = {};
+
+  // 정류장별로 "다음에 다시 팝업을 띄울 수 있는 시간" 저장
+  final Map<String, DateTime> _quickReportSnoozedUntilByStation = {};
+
+  Timer? _quickReportPromptTimer;
+
+  bool _isQuickReportSheetOpen = false;
+  bool _isSubmittingQuickReport = false;
 
   List<Map<String, dynamic>> _schedules = [];
   String _classTimeText = '-';
@@ -164,6 +368,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     _waitingCountTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _loadWaitingCount();
+    });
+    _quickReportPromptTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _maybeShowQuickReportSheet();
     });
     _scheduleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       _updateNextClassText();
@@ -289,9 +496,21 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+
     if (oldWidget.userId != widget.userId ||
         oldWidget.refreshVersion != widget.refreshVersion) {
       _loadSchedules();
+    }
+
+    final bool becameActive = !oldWidget.isActive && widget.isActive;
+    final bool loginChangedWhileHomeActive =
+        oldWidget.userId != widget.userId && widget.isActive;
+
+    if (becameActive || loginChangedWhileHomeActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _maybeShowQuickReportSheet();
+      });
     }
   }
 
@@ -301,6 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _scheduleTimer?.cancel();
     _busTimetableTimer?.cancel();
     _waitingCountTimer?.cancel();
+    _quickReportPromptTimer?.cancel();
     _positionSubscription?.cancel();
     super.dispose();
   }
@@ -325,6 +545,61 @@ class _HomeScreenState extends State<HomeScreen> {
   bool get canSelectTransportMode =>
       activeStation == null || activeStation == selectedStation;
 
+  DateTime? get _lastQuickReportedAt {
+    final userId = widget.userId;
+    if (userId == null) return null;
+
+    return _lastQuickReportedAtByUser[userId];
+  }
+
+  Duration get _remainingQuickReportCooldown {
+    final lastReportedAt = _lastQuickReportedAt;
+
+    if (lastReportedAt == null) return Duration.zero;
+
+    final elapsed = DateTime.now().difference(lastReportedAt);
+
+    if (elapsed >= _quickReportCooldown) {
+      return Duration.zero;
+    }
+
+    return _quickReportCooldown - elapsed;
+  }
+
+  bool get _canQuickReport => _remainingQuickReportCooldown == Duration.zero;
+
+  String get _quickReportCooldownText {
+    final remaining = _remainingQuickReportCooldown;
+    final minutes = remaining.inMinutes;
+    final seconds = remaining.inSeconds % 60;
+
+    if (minutes > 0) {
+      return '$minutes분 $seconds초';
+    }
+
+    return '$seconds초';
+  }
+
+  bool _isQuickReportSnoozed(String stationName) {
+    final snoozedUntil = _quickReportSnoozedUntilByStation[stationName];
+
+    if (snoozedUntil == null) return false;
+
+    return DateTime.now().isBefore(snoozedUntil);
+  }
+
+  bool get _shouldShowQuickReportPrompt {
+    if (!widget.isActive) return false; // 홈 탭이 실제로 보일 때만 표시
+    if (widget.userId == null) return false;
+    if (_isWeekend) return false;
+    if (!isNearStation) return false;
+    if (!_canQuickReport) return false;
+    if (_isQuickReportSheetOpen) return false;
+    if (_isQuickReportSnoozed(selectedStation)) return false;
+
+    return true;
+  }
+
   String get _locationStatusText {
     if (!_locationPermissionGranted) return '📍 위치 권한이 필요합니다';
     if (_currentPosition == null) return '📍 위치 정보를 가져오는 중...';
@@ -343,6 +618,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ? '📍 현재 위치: 정류장 근처 ($distanceText · 50m 이내)'
         : '📍 현재 위치: 정류장까지 $distanceText (50m 이상)';
   }
+/*
+  bool get isNearStation {
+    return true; // 테스트용
+  }*/
 
   bool get isNearStation {
     if (!_locationPermissionGranted || _currentPosition == null) return false;
@@ -406,6 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (!mounted) return;
       setState(() { _currentPosition = position; });
+      _maybeShowQuickReportSheet();
     } catch (_) {}
 
     _positionSubscription = Geolocator.getPositionStream(
@@ -417,16 +697,25 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (position.accuracy > 50) return;
       setState(() { _currentPosition = position; });
+      _maybeShowQuickReportSheet();
     });
   }
 
   void _changeStation(String station) {
     setState(() { selectedStation = station; });
+
     _loadCongestionSummaries();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _maybeShowQuickReportSheet();
+    });
+
     if (_isWeekend) {
       _applyWeekendNoBusInfo(station);
       return;
     }
+
     if (station == '전정대') {
       _loadJeonjeongdaeBusTimetable();
     } else if (station == '정문' || station == '외대') {
@@ -721,20 +1010,72 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _updateRecommendation(String station) async {
-    int? travel;
     final building = _nextClassBuilding;
-    final destStation = (building != null) ? buildingToStation[building] : null;
-    if (destStation != null) {
-      travel = RouteRecommender.travelMinutesBetween(station, destStation);
+
+    // 다음 수업 건물 정보가 없으면 버스 추천
+    if (building == null) {
+      if (!mounted) return;
+
+      setState(() {
+        stationData[station]?['recommend'] = '버스';
+        stationData[station]?['reason'] =
+        '다음 수업 건물 정보가 없어, 현재 선택한 정류장의 버스 도착 정보를 기준으로 안내합니다.';
+      });
+
+      return;
     }
 
+    // 1. 무조건 도보 처리하는 경우
+    // 예: 정문 → 공학관, 외대 → 외대/멀관, 전정대 → 전정대/예대/국제대
+    if (_isWalkingOnlyBuilding(station: station, building: building)) {
+      if (!mounted) return;
+
+      setState(() {
+        stationData[station]?['recommend'] = '도보';
+
+        if (station == '정문' && building == '공학관') {
+          stationData[station]?['reason'] =
+          '정문에서는 공학관 방향으로 바로 이동할 수 있는 버스 경로가 없어 도보 이동을 추천합니다.';
+        } else {
+          stationData[station]?['reason'] =
+          '다음 수업 건물이 현재 선택한 정류장 근처에 있어 도보 이동을 추천합니다.';
+        }
+      });
+
+      return;
+    }
+
+    // 2. 출발 정류장에서 다음 수업 건물까지 이용 가능한 버스 경로 확인
+    final routeOption = _busRouteOptionToBuilding(
+      station: station,
+      building: building,
+    );
+
+    // 3. 버스 경로가 없으면 도보 추천
+    if (routeOption == null) {
+      if (!mounted) return;
+
+      setState(() {
+        stationData[station]?['recommend'] = '도보';
+        stationData[station]?['reason'] =
+        '현재 선택한 정류장에서는 다음 수업 건물 방향으로 이용할 수 있는 버스 경로가 없어 도보 이동을 추천합니다.';
+      });
+
+      return;
+    }
+
+    // 4. 버스 경로가 있으면 탑승 예측 계산
     int? wait;
     int failedBus = 0;
     int waitingCount = 0;
+
     final prediction = await _calculateBoardingPrediction(station);
+
     if (prediction != null) {
       waitingCount = prediction['waitingCountAtStart'] as int? ?? 0;
+
       final rec = prediction['recommendedBus'] as Map<String, dynamic>?;
+
       if (rec != null) {
         wait = (rec['arrivalMinute'] as num?)?.toInt();
         failedBus = ((rec['arrivalOrder'] as int?) ?? 1) - 1;
@@ -745,15 +1086,22 @@ class _HomeScreenState extends State<HomeScreen> {
       waitingCount: waitingCount,
       failedBusCount: failedBus,
       waitMinutes: wait,
-      travelMinutes: travel,
+      travelMinutes: routeOption.travelMinutes,
       walkMinutes: _walkMinutesToDestination(),
       limitMinutes: _nextClassRemainMinute,
     );
 
     if (!mounted) return;
+
     setState(() {
       stationData[station]?['recommend'] = decision.isBus ? '버스' : '도보';
-      stationData[station]?['reason'] = decision.reason; // ← reason 저장
+
+      if (decision.isBus) {
+        stationData[station]?['reason'] =
+        '${routeOption.routeText} 기준의 이동 시간 ${routeOption.travelMinutes}분과 버스 대기 시간을 함께 계산해, 버스 이동을 추천합니다.';
+      } else {
+        stationData[station]?['reason'] = decision.reason;
+      }
     });
   }
 
@@ -856,6 +1204,409 @@ class _HomeScreenState extends State<HomeScreen> {
     final busOrder = (myWaitingNumber! / busCapacity).ceil();
     if (busOrder <= 1) return '다음 버스';
     return '$busOrder번째 버스';
+  }
+
+  void _maybeShowQuickReportSheet() {
+    if (!_shouldShowQuickReportPrompt) return;
+
+    final stationName = selectedStation;
+
+    unawaited(_showQuickReportSheet(stationName));
+  }
+
+  Widget _buildQuickReportOptionCard({
+    required _QuickCongestionOption option,
+    required String stationName,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: _isSubmittingQuickReport
+            ? null
+            : () {
+          _submitQuickReport(
+            stationName: stationName,
+            congestionLevel: option.level,
+          );
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          height: 108,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: option.borderColor,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: option.borderColor,
+                    width: 1.2,
+                  ),
+                ),
+                child: Icon(
+                  option.icon,
+                  color: option.iconColor,
+                  size: 23,
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              Text(
+                option.label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: option.textColor,
+                  height: 1.12,
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: option.dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showQuickReportSheet(String stationName) async {
+    if (widget.userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그인이 필요합니다.')),
+      );
+      return;
+    }
+
+    if (_isWeekend) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('주말에는 혼잡도 제보를 이용할 수 없습니다.')),
+      );
+      return;
+    }
+
+    if (!isNearStation) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('정류장 50m 이내에서만 제보할 수 있어요.')),
+      );
+      return;
+    }
+
+    if (!_canQuickReport) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$_quickReportCooldownText 후 다시 제보할 수 있어요.')),
+      );
+      return;
+    }
+
+    if (_isQuickReportSheetOpen) return;
+
+    setState(() {
+      _isQuickReportSheetOpen = true;
+    });
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (bottomSheetContext) {
+        final screenHeight = MediaQuery.of(bottomSheetContext).size.height;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: screenHeight * 0.82,
+            ),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 18,
+                    offset: Offset(0, -6),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5E7EB),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '지금 $stationName 정류장의\n체감 혼잡도는 어떤가요?',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF111827),
+                                    height: 1.25,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  '한 번의 터치로 혼잡도 제보에 참여할 수 있어요',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF6B7280),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _quickReportSnoozedUntilByStation[stationName] =
+                                    DateTime.now().add(_quickReportCooldown);
+                              });
+
+                              Navigator.pop(bottomSheetContext);
+                            },
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF3F4F6),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                size: 20,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      Column(
+                        children: [
+                          Row(
+                            children: [
+                              _buildQuickReportOptionCard(
+                                option: _quickReportOptions[0],
+                                stationName: stationName,
+                              ),
+                              const SizedBox(width: 10),
+                              _buildQuickReportOptionCard(
+                                option: _quickReportOptions[1],
+                                stationName: stationName,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          Row(
+                            children: [
+                              _buildQuickReportOptionCard(
+                                option: _quickReportOptions[2],
+                                stationName: stationName,
+                              ),
+                              const SizedBox(width: 10),
+                              _buildQuickReportOptionCard(
+                                option: _quickReportOptions[3],
+                                stationName: stationName,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _quickReportSnoozedUntilByStation[stationName] =
+                                  DateTime.now().add(_quickReportCooldown);
+                            });
+
+                            Navigator.pop(bottomSheetContext);
+                          },
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFFF3F4F6),
+                            foregroundColor: const Color(0xFF6B7280),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Text(
+                            '나중에 할게요',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isQuickReportSheetOpen = false;
+    });
+  }
+
+  Future<void> _submitQuickReport({
+    required String stationName,
+    required String congestionLevel,
+  }) async {
+    final userId = widget.userId;
+
+    if (userId == null) return;
+    if (_isSubmittingQuickReport) return;
+
+    setState(() {
+      _isSubmittingQuickReport = true;
+    });
+
+    try {
+      final result = await ApiService.submitOpinion(
+        userId: userId,
+        stopName: stationName,
+        congestionLevel: congestionLevel,
+        comment: null,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        Navigator.pop(context);
+
+        setState(() {
+          _lastQuickReportedAtByUser[userId] = DateTime.now();
+        });
+
+        await _loadCongestionSummaries();
+
+        if (mounted) {
+          await _updateRecommendation(stationName);
+        }
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '[$stationName] $congestionLevel 제보가 탑승 예상에 반영되었어요.',
+            ),
+            backgroundColor: const Color(0xFF2563EB),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? '제보 저장에 실패했습니다.'),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('서버에 연결할 수 없습니다.'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmittingQuickReport = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadCongestionSummaries() async {
@@ -1103,13 +1854,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 22),
               const Text(
-                '정류장 선택',
+                '출발 정류장 선택',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF374151),
                 ),
               ),
+
               const SizedBox(height: 10),
               Row(
                 children: stations.map((station) {
@@ -1120,27 +1872,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: GestureDetector(
                         onTap: () => _changeStation(station),
                         child: Container(
-                          height: 38,
+                          height: 44,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? const Color(0xFF2563EB)
                                 : Colors.white,
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(28),
                             border: Border.all(
                               color: isSelected
                                   ? const Color(0xFF2563EB)
-                                  : const Color(0xFFE5E7EB),
+                                  : const Color(0xFFD1D5DC),
+                              width: 1.5,
                             ),
                           ),
                           child: Text(
                             station,
                             style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                               color: isSelected
                                   ? Colors.white
-                                  : const Color(0xFF374151),
+                                  : Colors.black,
                             ),
                           ),
                         ),
@@ -1267,6 +2020,7 @@ class _RecommendationCard extends StatelessWidget {
       child: Row(
         children: [
           Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 width: 42,
@@ -1283,8 +2037,9 @@ class _RecommendationCard extends StatelessWidget {
                   size: 23,
                 ),
               ),
+
               if (!isWalking && reason.isNotEmpty) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
                 _ReasonBadge(reason: reason),
               ],
             ],
@@ -1349,8 +2104,8 @@ class _RecommendationCard extends StatelessWidget {
                       Text(
                         isWalking
                             ? (estimatedArrivalAfterMinute == 0
-                            ? '다음 수업이 없습니다.'
-                            : '도보 예상 도착시간은 약 $estimatedArrivalAfterMinute분 후입니다')
+                            ? '다음 수업 정보가 없어\n예상 도보 시간을 계산할 수 없어요.'
+                            : '다음 수업 건물까지 걸어서 약 $estimatedArrivalAfterMinute분 걸려요.')
                             : hasBusInfo
                             ? arrival == '곧 출발'
                             ? '$bus 버스가 곧 도착합니다'
@@ -1553,7 +2308,7 @@ class _TransportModeCard extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
@@ -1588,7 +2343,7 @@ class _TransportModeCard extends StatelessWidget {
                             !hasBusInfo
                                 ? '현재 이용 불가'
                                 : isNearStation
-                                ? '정류장 근처 확인됨'
+                                ? '내 탑승 예상 확인'
                                 : '정류장 근처에서만',
                             style: const TextStyle(
                               fontSize: 10,
@@ -1621,10 +2376,17 @@ class _TransportModeCard extends StatelessWidget {
                           Icon(Icons.directions_walk_rounded),
                           SizedBox(height: 5),
                           Text(
-                            '도보',
+                            '도보 이동',
                             style: TextStyle(fontWeight: FontWeight.w900),
                           ),
-                          SizedBox(height: 16),
+                          SizedBox(height: 3),
+                          Text(
+                            '예상 도보 시간 확인',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1780,7 +2542,7 @@ class _ReasonBadgeState extends State<_ReasonBadge> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    '추천 이유',
+                    '이동 수단 추천 기준',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -1826,8 +2588,8 @@ class _ReasonBadgeState extends State<_ReasonBadge> {
         );
       },
       child: Container(
-        width: 22,
-        height: 22,
+        width: 25,
+        height: 25,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white.withOpacity(0.2),
@@ -1837,7 +2599,7 @@ class _ReasonBadgeState extends State<_ReasonBadge> {
             '?',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
               height: 1.0,
             ),
@@ -1846,4 +2608,27 @@ class _ReasonBadgeState extends State<_ReasonBadge> {
       ),
     );
   }
+}
+class _QuickCongestionOption {
+  final String level;
+  final String label;
+  final IconData icon;
+  final Color bgColor;
+  final Color borderColor;
+  final Color iconBgColor;
+  final Color iconColor;
+  final Color textColor;
+  final Color dotColor;
+
+  const _QuickCongestionOption({
+    required this.level,
+    required this.label,
+    required this.icon,
+    required this.bgColor,
+    required this.borderColor,
+    required this.iconBgColor,
+    required this.iconColor,
+    required this.textColor,
+    required this.dotColor,
+  });
 }

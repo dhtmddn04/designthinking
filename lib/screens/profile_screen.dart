@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
-
 // ─────────────────────────────────────────────
 // 데이터 모델
 // ─────────────────────────────────────────────
@@ -10,7 +11,8 @@ class TimetableEntry {
   final String day;
   final int startMinute;
   final int endMinute;
-  final String room;
+  final String buildingName;
+  final String roomNumber;
   final Color color;
 
   TimetableEntry({
@@ -18,9 +20,12 @@ class TimetableEntry {
     required this.day,
     required this.startMinute,
     required this.endMinute,
-    required this.room,
+    required this.buildingName,
+    required this.roomNumber,
     required this.color,
   });
+
+  String get room => '$buildingName $roomNumber'.trim();
 }
 
 final List<TimetableEntry> initialTimetable = [
@@ -28,49 +33,56 @@ final List<TimetableEntry> initialTimetable = [
     day: '월',
     startMinute: 9 * 60,
     endMinute: 11 * 60,
-    room: '공학관 301',
+    buildingName: '공학관',
+    roomNumber: '301',
     color: Colors.blue,
   ),
   TimetableEntry(
     day: '월',
     startMinute: 13 * 60,
     endMinute: 16 * 60,
-    room: '본관 201',
+    buildingName: '외국어대학관',
+    roomNumber: '201',
     color: Colors.green,
   ),
   TimetableEntry(
     day: '화',
     startMinute: 10 * 60 + 15,
     endMinute: 12 * 60,
-    room: '공학관 205',
+    buildingName: '멀티미디어교육관',
+    roomNumber: '701',
     color: Colors.purple,
   ),
   TimetableEntry(
     day: '수',
     startMinute: 9 * 60,
     endMinute: 11 * 60,
-    room: '공학관 301',
+    buildingName: '전자정보대학관',
+    roomNumber: 'B04',
     color: Colors.blue,
   ),
   TimetableEntry(
     day: '수',
     startMinute: 14 * 60 + 30,
     endMinute: 16 * 60,
-    room: '중앙도서관 501',
+    buildingName: '체육대학관',
+    roomNumber: '261',
     color: Colors.orange,
   ),
   TimetableEntry(
     day: '목',
     startMinute: 10 * 60,
     endMinute: 12 * 60,
-    room: '공학관 205',
+    buildingName: '전자정보대학관',
+    roomNumber: '111',
     color: Colors.purple,
   ),
   TimetableEntry(
     day: '금',
     startMinute: 13 * 60,
     endMinute: 16 * 60,
-    room: '본관 201',
+    buildingName: '전자정보대학관',
+    roomNumber: '304',
     color: Colors.green,
   ),
 ];
@@ -82,16 +94,22 @@ final List<TimetableEntry> initialTimetable = [
 class ProfileScreen extends StatefulWidget {
   final int? userId;
   final String? username;
+  final String? phone;
+  final bool needsWheelchair;
   final Future<void> Function(Map<String, dynamic> user, bool autoLogin)
   onLoginSuccess;
   final Future<void> Function() onLogoutSuccess;
+  final Future<void> Function(Map<String, dynamic> user) onProfileUpdated;
 
   const ProfileScreen({
     super.key,
     required this.userId,
     required this.username,
+    required this.phone,
+    required this.needsWheelchair,
     required this.onLoginSuccess,
     required this.onLogoutSuccess,
+    required this.onProfileUpdated,
   });
 
   @override
@@ -102,7 +120,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late bool _isLoggedIn;
   bool _showSignup = false;
   String _loggedInUser = '';
-  //List<TimetableEntry> _timetable = List.from(initialTimetable);
+  String _phone = '';
+  bool _needsWheelchair = false;
   List<TimetableEntry> _timetable = [];
 
   @override
@@ -111,6 +130,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     _isLoggedIn = widget.userId != null;
     _loggedInUser = widget.username ?? '';
+    _phone = widget.phone ?? '';
+    _needsWheelchair = widget.needsWheelchair;
 
     if (widget.userId != null) {
       _loadTimetable(widget.userId!);
@@ -132,6 +153,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _isLoggedIn = false;
       _loggedInUser = '';
+      _phone = '';
+      _needsWheelchair = false;
       _showSignup = false;
       _timetable = [];
     });
@@ -141,6 +164,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _timetable = updatedTimetable;
     });
+  }
+
+  Future<void> _handleProfileUpdated(Map<String, dynamic> user) async {
+    setState(() {
+      _loggedInUser = user['username']?.toString() ?? _loggedInUser;
+      _phone = user['phone']?.toString() ?? _phone;
+      _needsWheelchair = user['needsWheelchair'] == true;
+    });
+
+    await widget.onProfileUpdated(user);
   }
 
   int? _parseTimeToMinute(String? text) {
@@ -191,7 +224,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               day: schedule['dayOfWeek'],
               startMinute: startMinute,
               endMinute: endMinute,
-              room: '$buildingName $roomNumber',
+              buildingName: buildingName.toString(),
+              roomNumber: roomNumber.toString(),
               color: colors[index % colors.length],
             );
           }).toList();
@@ -210,18 +244,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void didUpdateWidget(covariant ProfileScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.userId != widget.userId) {
+    if (oldWidget.userId != widget.userId ||
+        oldWidget.username != widget.username ||
+        oldWidget.phone != widget.phone ||
+        oldWidget.needsWheelchair != widget.needsWheelchair) {
       if (widget.userId != null) {
         setState(() {
           _isLoggedIn = true;
           _loggedInUser = widget.username ?? '';
+          _phone = widget.phone ?? '';
+          _needsWheelchair = widget.needsWheelchair;
         });
 
-        _loadTimetable(widget.userId!);
+        if (oldWidget.userId != widget.userId) {
+          _loadTimetable(widget.userId!);
+        }
       } else {
         setState(() {
           _isLoggedIn = false;
           _loggedInUser = '';
+          _phone = '';
+          _needsWheelchair = false;
           _showSignup = false;
           _timetable = [];
         });
@@ -256,9 +299,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ProfileContentView(
       userId: widget.userId,
       username: _loggedInUser,
+      phone: _phone,
+      needsWheelchair: _needsWheelchair,
       timetable: _timetable,
       onLogout: _logout,
       onTimetableUpdated: _updateTimetable,
+      onProfileUpdated: _handleProfileUpdated,
     );
   }
 }
@@ -485,7 +531,6 @@ class _LoginViewState extends State<LoginView> {
 // ─────────────────────────────────────────────
 // 회원가입 화면
 // ─────────────────────────────────────────────
-
 class SignupView extends StatefulWidget {
   final VoidCallback onBackToLogin;
 
@@ -500,7 +545,10 @@ class _SignupViewState extends State<SignupView> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordConfirmController =
       TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+
+  final TextEditingController _phoneMiddleController = TextEditingController();
+  final TextEditingController _phoneLastController = TextEditingController();
+  final FocusNode _phoneLastFocusNode = FocusNode();
 
   bool _needsWheelchair = true;
 
@@ -509,8 +557,51 @@ class _SignupViewState extends State<SignupView> {
     _usernameController.dispose();
     _passwordController.dispose();
     _passwordConfirmController.dispose();
-    _phoneController.dispose();
+    _phoneMiddleController.dispose();
+    _phoneLastController.dispose();
+    _phoneLastFocusNode.dispose();
     super.dispose();
+  }
+
+  Widget _buildPhonePartField({
+    required TextEditingController controller,
+    required String hintText,
+    FocusNode? focusNode,
+    void Function(String)? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      maxLength: 4,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(4),
+      ],
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        counterText: '',
+        hintText: hintText,
+        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.7),
+        ),
+      ),
+    );
   }
 
   @override
@@ -569,10 +660,67 @@ class _SignupViewState extends State<SignupView> {
 
               _buildLabel('휴대전화'),
               const SizedBox(height: 8),
-              _buildTextField(
-                controller: _phoneController,
-                hintText: '010-1234-5678',
-                keyboardType: TextInputType.phone,
+              Row(
+                children: [
+                  Container(
+                    width: 70,
+                    height: 49,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                    ),
+                    child: const Text(
+                      '010',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '-',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPhonePartField(
+                      controller: _phoneMiddleController,
+                      hintText: '1234',
+                      onChanged: (value) {
+                        if (value.length == 4) {
+                          _phoneLastFocusNode.requestFocus();
+                        }
+                      },
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '-',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPhonePartField(
+                      controller: _phoneLastController,
+                      hintText: '5678',
+                      focusNode: _phoneLastFocusNode,
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 18),
@@ -617,14 +765,24 @@ class _SignupViewState extends State<SignupView> {
                   final password = _passwordController.text.trim();
                   final passwordConfirm = _passwordConfirmController.text
                       .trim();
-                  final phone = _phoneController.text.trim();
+                  final phoneMiddle = _phoneMiddleController.text.trim();
+                  final phoneLast = _phoneLastController.text.trim();
+                  final phone = '010-$phoneMiddle-$phoneLast';
 
                   if (username.isEmpty ||
                       password.isEmpty ||
                       passwordConfirm.isEmpty ||
-                      phone.isEmpty) {
+                      phoneMiddle.isEmpty ||
+                      phoneLast.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('모든 정보를 입력해주세요.')),
+                    );
+                    return;
+                  }
+
+                  if (phoneMiddle.length != 4 || phoneLast.length != 4) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('휴대전화 번호는 4자리씩 입력해주세요.')),
                     );
                     return;
                   }
@@ -693,17 +851,23 @@ class _SignupViewState extends State<SignupView> {
 class ProfileContentView extends StatelessWidget {
   final int? userId;
   final String username;
+  final String phone;
+  final bool needsWheelchair;
   final List<TimetableEntry> timetable;
   final VoidCallback onLogout;
   final void Function(List<TimetableEntry>) onTimetableUpdated;
+  final Future<void> Function(Map<String, dynamic> user) onProfileUpdated;
 
   const ProfileContentView({
     super.key,
     required this.userId,
     required this.username,
+    required this.phone,
+    required this.needsWheelchair,
     required this.timetable,
     required this.onLogout,
     required this.onTimetableUpdated,
+    required this.onProfileUpdated,
   });
 
   @override
@@ -774,6 +938,85 @@ class ProfileContentView extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
                 child: Column(
                   children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                '프로필 정보',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF111827),
+                                ),
+                              ),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: () {
+                                  if (userId == null) return;
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ProfileEditScreen(
+                                        userId: userId!,
+                                        username: username,
+                                        phone: phone,
+                                        needsWheelchair: needsWheelchair,
+                                        onProfileUpdated: onProfileUpdated,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit_outlined,
+                                    color: Color(0xFF2563EB),
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _ProfileInfoRow(label: '아이디', value: username),
+                          const SizedBox(height: 10),
+                          _ProfileInfoRow(
+                            label: '휴대전화',
+                            value: phone.isEmpty ? '등록된 번호 없음' : phone,
+                          ),
+                          const SizedBox(height: 10),
+                          _ProfileInfoRow(
+                            label: '휠체어 탑승 여부',
+                            value: needsWheelchair ? '예' : '아니오',
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
@@ -870,6 +1113,378 @@ class ProfileContentView extends StatelessWidget {
   }
 }
 
+class _ProfileInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ProfileInfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6B7280),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class ProfileEditScreen extends StatefulWidget {
+  final int userId;
+  final String username;
+  final String phone;
+  final bool needsWheelchair;
+  final Future<void> Function(Map<String, dynamic> user) onProfileUpdated;
+
+  const ProfileEditScreen({
+    super.key,
+    required this.userId,
+    required this.username,
+    required this.phone,
+    required this.needsWheelchair,
+    required this.onProfileUpdated,
+  });
+
+  @override
+  State<ProfileEditScreen> createState() => _ProfileEditScreenState();
+}
+
+class _ProfileEditScreenState extends State<ProfileEditScreen> {
+  late TextEditingController _phoneMiddleController;
+  late TextEditingController _phoneLastController;
+  final FocusNode _phoneLastFocusNode = FocusNode();
+
+  late bool _needsWheelchair;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final parts = widget.phone.split('-');
+
+    _phoneMiddleController = TextEditingController(
+      text: parts.length == 3 ? parts[1] : '',
+    );
+
+    _phoneLastController = TextEditingController(
+      text: parts.length == 3 ? parts[2] : '',
+    );
+
+    _needsWheelchair = widget.needsWheelchair;
+  }
+
+  @override
+  void dispose() {
+    _phoneMiddleController.dispose();
+    _phoneLastController.dispose();
+    _phoneLastFocusNode.dispose();
+    super.dispose();
+  }
+
+  Widget _buildPhonePartField({
+    required TextEditingController controller,
+    required String hintText,
+    FocusNode? focusNode,
+    void Function(String)? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      maxLength: 4,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(4),
+      ],
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        counterText: '',
+        hintText: hintText,
+        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.7),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveProfile() async {
+    final phoneMiddle = _phoneMiddleController.text.trim();
+    final phoneLast = _phoneLastController.text.trim();
+    final phone = '010-$phoneMiddle-$phoneLast';
+
+    if (phoneMiddle.isEmpty || phoneLast.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('휴대전화 번호를 모두 입력해주세요.')),
+      );
+      return;
+    }
+
+    if (phoneMiddle.length != 4 || phoneLast.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('휴대전화 번호는 4자리씩 입력해주세요.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final result = await ApiService.updateProfile(
+        userId: widget.userId,
+        phone: phone,
+        needsWheelchair: _needsWheelchair,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? '프로필 수정 결과를 확인할 수 없습니다.'),
+        ),
+      );
+
+      if (result['success'] == true) {
+        final user = Map<String, dynamic>.from(result['user']);
+
+        await widget.onProfileUpdated(user);
+
+        if (!mounted) return;
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          '프로필 수정',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF111827),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 24, 22, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('아이디'),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                ),
+                child: Text(
+                  widget.username,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              _buildLabel('휴대전화'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 70,
+                    height: 49,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                    ),
+                    child: const Text(
+                      '010',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '-',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPhonePartField(
+                      controller: _phoneMiddleController,
+                      hintText: '1234',
+                      onChanged: (value) {
+                        if (value.length == 4) {
+                          _phoneLastFocusNode.requestFocus();
+                        }
+                      },
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '-',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPhonePartField(
+                      controller: _phoneLastController,
+                      hintText: '5678',
+                      focusNode: _phoneLastFocusNode,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              _buildLabel('휠체어 탑승 여부'),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildToggleButton(
+                      label: '예',
+                      selected: _needsWheelchair,
+                      onTap: () {
+                        setState(() {
+                          _needsWheelchair = true;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildToggleButton(
+                      label: '아니오',
+                      selected: !_needsWheelchair,
+                      onTap: () {
+                        setState(() {
+                          _needsWheelchair = false;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 28),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF93C5FD),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    _isSaving ? '저장 중...' : '수정 완료',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────
 // 시간표 편집 화면
 // ─────────────────────────────────────────────
@@ -926,7 +1541,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     Colors.red,
   ];
 
-  int _colorIndex = 0;
+  bool _isAddingClass = false;
+
+  int? _editingScheduleId;
+  bool _isUpdatingClass = false;
+
+  bool get _isEditing => _editingScheduleId != null;
 
   @override
   void initState() {
@@ -960,15 +1580,138 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     return hour * 60 + minute;
   }
 
+  Future<void> _pickTime(
+      TextEditingController controller, {
+        bool isStartTime = false,
+      }) async {
+    final currentMinute = _parseTimeToMinute(controller.text) ?? 9 * 60;
+
+    final now = DateTime.now();
+
+    DateTime selectedTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      currentMinute ~/ 60,
+      currentMinute % 60,
+    );
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SizedBox(
+          height: 300,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        '취소',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        final pickedMinute = selectedTime.hour * 60 + selectedTime.minute;
+
+                        final hourText = selectedTime.hour.toString().padLeft(2, '0');
+                        final minuteText = selectedTime.minute.toString().padLeft(2, '0');
+
+                        setState(() {
+                          controller.text = '$hourText:$minuteText';
+
+                          // 시작 시간을 고른 경우,
+                          // 종료 시간이 시작 시간보다 빠르거나 같으면 자동으로 시작 + 1시간으로 보정
+                          if (isStartTime) {
+                            final currentEndMinute = _parseTimeToMinute(_endTimeController.text);
+
+                            if (currentEndMinute == null || currentEndMinute <= pickedMinute) {
+                              int adjustedEndMinute = pickedMinute + 60;
+
+                              // 23:55를 넘어가지 않도록 제한
+                              if (adjustedEndMinute > 23 * 60 + 55) {
+                                adjustedEndMinute = 23 * 60 + 55;
+                              }
+
+                              _endTimeController.text = _formatMinute(adjustedEndMinute);
+                            }
+                          }
+                        });
+
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        '완료',
+                        style: TextStyle(
+                          color: Color(0xFF2563EB),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  use24hFormat: true,
+                  minuteInterval: 5,
+                  initialDateTime: selectedTime,
+                  onDateTimeChanged: (DateTime value) {
+                    selectedTime = value;
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   bool get _canAddClass {
     final startMinute = _parseTimeToMinute(_startTimeController.text);
     final endMinute = _parseTimeToMinute(_endTimeController.text);
 
-    return _selectedDays.isNotEmpty &&
+    return !_isAddingClass &&
+        !_isUpdatingClass &&
+        _selectedDays.isNotEmpty &&
         _roomNumberController.text.trim().isNotEmpty &&
         startMinute != null &&
         endMinute != null &&
         startMinute < endMinute;
+  }
+
+  bool _hasOverlappingClass(
+      String day,
+      int startMinute,
+      int endMinute, {
+        int? exceptScheduleId,
+      }) {
+    return _timetable.any((entry) {
+      if (exceptScheduleId != null && entry.id == exceptScheduleId) {
+        return false;
+      }
+
+      return entry.day == day &&
+          startMinute < entry.endMinute &&
+          endMinute > entry.startMinute;
+    });
   }
 
   Future<void> _loadSchedulesFromServer() async {
@@ -998,13 +1741,140 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
           day: schedule['dayOfWeek'],
           startMinute: startMinute,
           endMinute: endMinute,
-          room: '$buildingName $roomNumber',
+          buildingName: buildingName.toString(),
+          roomNumber: roomNumber.toString(),
           color: _colors[index % _colors.length],
         );
       }).toList();
     });
 
     widget.onSave(_timetable);
+  }
+
+  void _resetClassForm() {
+    setState(() {
+      _editingScheduleId = null;
+      _selectedDays.clear();
+      _startTimeController.text = '09:00';
+      _endTimeController.text = '10:00';
+      _roomNumberController.clear();
+      _selectedBuilding = '공학관';
+    });
+  }
+
+  void _startEditClass(int index) {
+    final entry = _timetable[index];
+
+    if (entry.id == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('수정할 시간표 정보를 찾을 수 없습니다.')));
+      return;
+    }
+
+    setState(() {
+      _editingScheduleId = entry.id;
+
+      _selectedDays
+        ..clear()
+        ..add(entry.day);
+
+      _startTimeController.text = _formatMinute(entry.startMinute);
+      _endTimeController.text = _formatMinute(entry.endMinute);
+      _selectedBuilding = entry.buildingName;
+      _roomNumberController.text = entry.roomNumber;
+    });
+  }
+
+  Future<void> _updateClass() async {
+    final userId = widget.userId;
+    final scheduleId = _editingScheduleId;
+
+    if (userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      return;
+    }
+
+    if (scheduleId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('수정할 시간표를 선택해주세요.')));
+      return;
+    }
+
+    final startMinute = _parseTimeToMinute(_startTimeController.text);
+    final endMinute = _parseTimeToMinute(_endTimeController.text);
+
+    if (!_canAddClass || startMinute == null || endMinute == null) return;
+
+    if (_selectedDays.length != 1) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('수정할 요일은 하나만 선택해주세요.')));
+      return;
+    }
+
+    final selectedDay = _selectedDays.first;
+
+    final hasOverlap = _hasOverlappingClass(
+      selectedDay,
+      startMinute,
+      endMinute,
+      exceptScheduleId: scheduleId,
+    );
+
+    if (hasOverlap) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$selectedDay요일 같은 시간대에 이미 수업이 있습니다.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdatingClass = true;
+    });
+
+    try {
+      final result = await ApiService.updateSchedule(
+        userId: userId,
+        scheduleId: scheduleId,
+        dayOfWeek: selectedDay,
+        startTime: _startTimeController.text.trim(),
+        endTime: _endTimeController.text.trim(),
+        buildingName: _selectedBuilding,
+        roomNumber: _roomNumberController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        await _loadSchedulesFromServer();
+
+        _resetClassForm();
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('시간표가 수정되었습니다.')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? '시간표 수정에 실패했습니다.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingClass = false;
+        });
+      }
+    }
   }
 
   Future<void> _addClass() async {
@@ -1021,6 +1891,23 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     final endMinute = _parseTimeToMinute(_endTimeController.text);
 
     if (!_canAddClass || startMinute == null || endMinute == null) return;
+
+    final overlappingDay = _selectedDays.where((day) {
+      return _hasOverlappingClass(day, startMinute, endMinute);
+    }).toList();
+
+    if (overlappingDay.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${overlappingDay.first}요일 같은 시간대에 이미 수업이 있습니다.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isAddingClass = true;
+    });
 
     try {
       for (final day in _selectedDays) {
@@ -1047,13 +1934,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
       await _loadSchedulesFromServer();
 
-      setState(() {
-        _selectedDays.clear();
-        _startTimeController.text = '09:00';
-        _endTimeController.text = '10:00';
-        _roomNumberController.clear();
-        _selectedBuilding = '공학관';
-      });
+      _resetClassForm();
 
       ScaffoldMessenger.of(
         context,
@@ -1064,6 +1945,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAddingClass = false;
+        });
+      }
     }
   }
 
@@ -1247,7 +2134,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                     const SizedBox(height: 16),
 
                     _sectionCard(
-                      title: '수업 추가',
+                      title: _isEditing ? '수업 수정' : '수업 추가',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1262,6 +2149,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 child: GestureDetector(
                                   onTap: () {
                                     setState(() {
+                                      if (_isEditing) {
+                                        _selectedDays
+                                          ..clear()
+                                          ..add(day);
+                                        return;
+                                      }
+
                                       if (selected) {
                                         _selectedDays.remove(day);
                                       } else {
@@ -1313,7 +2207,11 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                     _buildTextField(
                                       controller: _startTimeController,
                                       hintText: '예: 09:15',
-                                      keyboardType: TextInputType.text,
+                                      readOnly: true,
+                                      onTap: () => _pickTime(
+                                        _startTimeController,
+                                        isStartTime: true,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1328,7 +2226,8 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                     _buildTextField(
                                       controller: _endTimeController,
                                       hintText: '예: 10:45',
-                                      keyboardType: TextInputType.text,
+                                      readOnly: true,
+                                      onTap: () => _pickTime(_endTimeController),
                                     ),
                                   ],
                                 ),
@@ -1413,7 +2312,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _canAddClass ? _addClass : null,
+                              onPressed: _canAddClass
+                                  ? (_isEditing ? _updateClass : _addClass)
+                                  : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2563EB),
                                 disabledBackgroundColor: const Color(
@@ -1431,8 +2332,14 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                   borderRadius: BorderRadius.circular(11),
                                 ),
                               ),
-                              child: const Text(
-                                '수업 추가',
+                              child: Text(
+                                _isUpdatingClass
+                                    ? '수정 중...'
+                                    : _isAddingClass
+                                      ? '추가 중...'
+                                      : _isEditing
+                                        ? '수정 완료'
+                                        : '수업 추가',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
@@ -1440,6 +2347,22 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                               ),
                             ),
                           ),
+                          if (_isEditing) ...[
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: TextButton(
+                                onPressed: _resetClassForm,
+                                child: const Text(
+                                  '수정 취소',
+                                  style: TextStyle(
+                                    color: Color(0xFF6B7280),
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1506,6 +2429,26 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                       ],
                                     ),
                                   ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      _startEditClass(index);
+                                    },
+                                    child: Container(
+                                      width: 30,
+                                      height: 30,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      child: const Icon(
+                                        Icons.edit_outlined,
+                                        color: Color(0xFF2563EB),
+                                        size: 17,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 8),
 
                                   GestureDetector(
                                     onTap: () {
@@ -1614,176 +2557,299 @@ class TimetableGrid extends StatelessWidget {
   const TimetableGrid({super.key, required this.timetable});
 
   static const List<String> _days = ['월', '화', '수', '목', '금'];
-  static const List<int> _hours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 
-  static const double _timeColumnWidth = 24;
-  static const double _dayColumnWidth = 48;
-  static const double _rowHeight = 32;
+  // 기본 표시 범위: 09:00 ~ 18:00
+  static const int _defaultStartHour = 9;
+  static const int _defaultEndHour = 18;
+
+  // 표 크기 조정
+  // 기존 dayColumnWidth가 48이라 너무 좁았으므로 70으로 넓힘
+  static const double _timeColumnWidth = 38;
+  static const double _dayColumnWidth = 70;
+  static const double _rowHeight = 42;
   static const double _gap = 2;
+
+  int get _visibleStartHour {
+    if (timetable.isEmpty) return _defaultStartHour;
+
+    int minStartMinute = timetable.first.startMinute;
+
+    for (final entry in timetable) {
+      if (entry.startMinute < minStartMinute) {
+        minStartMinute = entry.startMinute;
+      }
+    }
+
+    final classStartHour = minStartMinute ~/ 60;
+
+    // 기본은 9시부터 보여주되, 9시 이전 수업이 있으면 그 시간까지 확장
+    final result = classStartHour < _defaultStartHour
+        ? classStartHour
+        : _defaultStartHour;
+
+    // 0시보다 작아지는 예외 방지
+    return result < 0 ? 0 : result;
+  }
+
+  int get _visibleEndHour {
+    if (timetable.isEmpty) return _defaultEndHour;
+
+    int maxEndMinute = timetable.first.endMinute;
+
+    for (final entry in timetable) {
+      if (entry.endMinute > maxEndMinute) {
+        maxEndMinute = entry.endMinute;
+      }
+    }
+
+    // 예: 18:00이면 18, 18:10이면 19까지 표시
+    int classEndHour = maxEndMinute ~/ 60;
+    if (maxEndMinute % 60 != 0) {
+      classEndHour += 1;
+    }
+
+    final result = classEndHour > _defaultEndHour
+        ? classEndHour
+        : _defaultEndHour;
+
+    // 하루 최대 24시까지만 표시
+    return result > 24 ? 24 : result;
+  }
+
+  List<int> get _visibleHours {
+    final startHour = _visibleStartHour;
+    final endHour = _visibleEndHour;
+
+    if (endHour <= startHour) {
+      return [_defaultStartHour];
+    }
+
+    return List.generate(
+      endHour - startHour,
+          (index) => startHour + index,
+    );
+  }
+
+  String _formatHourLabel(int hour) {
+    return hour.toString().padLeft(2, '0');
+  }
+
+  String _shortRoomName(String room) {
+    // 시간표 칸이 좁으므로 긴 건물명은 약칭으로 줄여 표시
+    return room
+        .replaceAll('외국어대학관', '외대')
+        .replaceAll('멀티미디어교육관', '멀관')
+        .replaceAll('생명과학대학관', '생대')
+        .replaceAll('전자정보대학관', '전정대')
+        .replaceAll('예술디자인대학관', '예대')
+        .replaceAll('체육대학관', '체대')
+        .replaceAll('국제학관', '국제대');
+  }
 
   @override
   Widget build(BuildContext context) {
+    final visibleHours = _visibleHours;
+    final int timetableStartMinute = _visibleStartHour * 60;
+    final int timetableEndMinute = _visibleEndHour * 60;
+
     final double gridWidth =
         _timeColumnWidth + (_dayColumnWidth + _gap) * _days.length;
 
-    return Center(
-      child: SizedBox(
-        width: gridWidth,
-        child: Column(
-          children: [
-            Row(
-              children: [
-                const SizedBox(width: _timeColumnWidth),
-                ..._days.map((day) {
-                  return SizedBox(
-                    width: _dayColumnWidth,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: _gap / 2),
-                      padding: const EdgeInsets.symmetric(vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        day,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF374151),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double viewportWidth = constraints.maxWidth;
 
-            const SizedBox(height: 5),
-
-            Stack(
-              children: [
-                Column(
-                  children: _hours.map((hour) {
-                    return Row(
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: gridWidth < viewportWidth ? viewportWidth : gridWidth,
+            child: Center(
+              child: SizedBox(
+                width: gridWidth,
+                child: Column(
+                  children: [
+                    // 요일 헤더
+                    Row(
                       children: [
-                        SizedBox(
-                          width: _timeColumnWidth,
-                          height: _rowHeight,
-                          child: Center(
-                            child: Text(
-                              '$hour',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Color(0xFF9CA3AF),
-                              ),
-                            ),
-                          ),
-                        ),
+                        const SizedBox(width: _timeColumnWidth),
                         ..._days.map((day) {
-                          final int cellStart = hour * 60;
-                          final int cellEnd = (hour + 1) * 60;
-
-                          final bool isOccupied = timetable.any((entry) {
-                            return entry.day == day &&
-                                entry.startMinute < cellEnd &&
-                                entry.endMinute > cellStart;
-                          });
-
-                          return Container(
-                            width: _dayColumnWidth,
-                            height: _rowHeight,
-                            margin: const EdgeInsets.all(_gap / 2),
-                            decoration: BoxDecoration(
-                              color: isOccupied
-                                  ? Colors.transparent
-                                  : const Color(0xFFF9FAFB),
-                              border: Border.all(
-                                color: isOccupied
-                                    ? Colors.transparent
-                                    : const Color(0xFFE5E7EB),
+                          return SizedBox(
+                            width: _dayColumnWidth + _gap,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: _gap / 2,
                               ),
-                              borderRadius: BorderRadius.circular(4),
+                              padding: const EdgeInsets.symmetric(vertical: 7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                              child: Text(
+                                day,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF374151),
+                                ),
+                              ),
                             ),
                           );
                         }),
                       ],
-                    );
-                  }).toList(),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Stack(
+                      children: [
+                        // 배경 격자
+                        Column(
+                          children: visibleHours.map((hour) {
+                            return Row(
+                              children: [
+                                SizedBox(
+                                  width: _timeColumnWidth,
+                                  height: _rowHeight + _gap,
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        _formatHourLabel(hour),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF9CA3AF),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                ..._days.map((day) {
+                                  final int cellStart = hour * 60;
+                                  final int cellEnd = (hour + 1) * 60;
+
+                                  final bool isOccupied = timetable.any((entry) {
+                                    return entry.day == day &&
+                                        entry.startMinute < cellEnd &&
+                                        entry.endMinute > cellStart;
+                                  });
+
+                                  return Container(
+                                    width: _dayColumnWidth,
+                                    height: _rowHeight,
+                                    margin: const EdgeInsets.all(_gap / 2),
+                                    decoration: BoxDecoration(
+                                      color: isOccupied
+                                          ? Colors.transparent
+                                          : const Color(0xFFF9FAFB),
+                                      border: Border.all(
+                                        color: isOccupied
+                                            ? Colors.transparent
+                                            : const Color(0xFFE5E7EB),
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+
+                        // 수업 블록
+                        ..._days.asMap().entries.expand((dayEntry) {
+                          final int dayIndex = dayEntry.key;
+                          final String day = dayEntry.value;
+
+                          return timetable
+                              .where((entry) => entry.day == day)
+                              .map((entry) {
+                            // 표시 범위 밖의 수업은 그리지 않음
+                            if (entry.endMinute <= timetableStartMinute ||
+                                entry.startMinute >= timetableEndMinute) {
+                              return const SizedBox.shrink();
+                            }
+
+                            // 표시 범위를 벗어나는 수업은 보이는 구간만 잘라서 표시
+                            final int visibleStart =
+                            entry.startMinute < timetableStartMinute
+                                ? timetableStartMinute
+                                : entry.startMinute;
+
+                            final int visibleEnd =
+                            entry.endMinute > timetableEndMinute
+                                ? timetableEndMinute
+                                : entry.endMinute;
+
+                            final double top =
+                                ((visibleStart - timetableStartMinute) / 60) *
+                                    (_rowHeight + _gap);
+
+                            final double left = _timeColumnWidth +
+                                dayIndex * (_dayColumnWidth + _gap);
+
+                            final double calculatedHeight =
+                                ((visibleEnd - visibleStart) / 60) *
+                                    (_rowHeight + _gap) -
+                                    _gap;
+
+                            final double blockHeight =
+                            calculatedHeight < 24 ? 24 : calculatedHeight;
+
+                            return Positioned(
+                              top: top,
+                              left: left,
+                              width: _dayColumnWidth,
+                              height: blockHeight,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: _gap / 2,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: entry.color,
+                                  borderRadius: BorderRadius.circular(7),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: entry.color.withOpacity(0.25),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _shortRoomName(entry.room),
+                                    textAlign: TextAlign.center,
+                                    maxLines: blockHeight < 36 ? 1 : 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      height: 1.15,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          });
+                        }),
+                      ],
+                    ),
+                  ],
                 ),
-
-                ..._days.asMap().entries.expand((dayEntry) {
-                  final int dayIndex = dayEntry.key;
-                  final String day = dayEntry.value;
-
-                  return timetable.where((entry) => entry.day == day).map((
-                    entry,
-                  ) {
-                    final int timetableStartMinute = _hours.first * 60;
-                    final int timetableEndMinute = (_hours.last + 1) * 60;
-
-                    if (entry.endMinute <= timetableStartMinute ||
-                        entry.startMinute >= timetableEndMinute) {
-                      return const SizedBox.shrink();
-                    }
-
-                    final int visibleStart =
-                        entry.startMinute < timetableStartMinute
-                        ? timetableStartMinute
-                        : entry.startMinute;
-
-                    final int visibleEnd = entry.endMinute > timetableEndMinute
-                        ? timetableEndMinute
-                        : entry.endMinute;
-
-                    final double top =
-                        ((visibleStart - timetableStartMinute) / 60) *
-                        (_rowHeight + _gap);
-
-                    final double left =
-                        _timeColumnWidth + dayIndex * (_dayColumnWidth + _gap);
-
-                    final double height =
-                        ((visibleEnd - visibleStart) / 60) *
-                            (_rowHeight + _gap) -
-                        _gap;
-
-                    return Positioned(
-                      top: top,
-                      left: left,
-                      width: _dayColumnWidth,
-                      height: height < 20 ? 20 : height,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: _gap / 2,
-                        ),
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: entry.color,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Center(
-                          child: Text(
-                            entry.room,
-                            textAlign: TextAlign.center,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 7,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  });
-                }),
-              ],
+              ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1811,11 +2877,15 @@ Widget _buildTextField({
   required String hintText,
   bool obscureText = false,
   TextInputType keyboardType = TextInputType.text,
+  bool readOnly = false,
+  VoidCallback? onTap,
 }) {
   return TextField(
     controller: controller,
     obscureText: obscureText,
     keyboardType: keyboardType,
+    readOnly: readOnly,
+    onTap: onTap,
     style: const TextStyle(fontSize: 14),
     decoration: InputDecoration(
       hintText: hintText,
