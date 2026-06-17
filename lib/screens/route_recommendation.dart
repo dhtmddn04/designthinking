@@ -10,7 +10,7 @@ class RouteDecision {
   final int? busTotalMinutes; // T_bus_total = T_wait + T_travel
   final int? walkMinutes; // T_walk
   final int? waitMinutes; // T_wait (추천 버스 도착까지)
-  final int? travelMinutes; // T_travel (정류장 -> 목적지 버스 이동)
+  final int? travelMinutes; // T_travel (출발 정류장 -> 다음 수업 건물 방향 버스 이동)
   final int? limitMinutes; // T_limit (수업까지 남은 시간)
 
   final int waitingCount; // N_wait (보정된 대기 인원)
@@ -85,43 +85,7 @@ class RouteRecommender {
   }
 
   // ---------------------------------------------------------------------------
-  // 3) 정류장 사이 버스 이동 시간 (링/순환 구조)
-  //    경로 방향: 정문 -> 외대 -> 전정대 -> 정문 (한 방향 순환)
-  //    구간 시간: 정문->외대 1분, 외대->전정대 2분, 전정대->정문 3분
-  // ---------------------------------------------------------------------------
-
-  static const List<String> _ringOrder = ['정문', '외대', '전정대'];
-
-  /// _ringOrder[i] -> _ringOrder[i+1] 로 가는 구간 시간(분)
-  static const List<int> _ringSegmentMinutes = [
-    1, // 정문 -> 외대
-    2, // 외대 -> 전정대
-    3, // 전정대 -> 정문
-  ];
-
-  /// [from] 정류장에서 [to] 정류장까지 버스로 가는 순수 이동 시간 (T_travel).
-  /// 같은 정류장이면 0, 알 수 없는 정류장이면 null.
-  static int? travelMinutesBetween(String from, String to) {
-    if (from == to) return 0;
-
-    final start = _ringOrder.indexOf(from);
-    final end = _ringOrder.indexOf(to);
-    if (start < 0 || end < 0) return null;
-
-    int total = 0;
-    int idx = start;
-
-    // 링을 한 방향으로 돌면서 to에 도달할 때까지 구간 시간을 누적
-    while (idx != end) {
-      total += _ringSegmentMinutes[idx];
-      idx = (idx + 1) % _ringOrder.length;
-    }
-
-    return total;
-  }
-
-  // ---------------------------------------------------------------------------
-  // 4) 도보 시간 T_walk
+  // 3) 도보 시간 T_walk
   // ---------------------------------------------------------------------------
 
   /// 두 좌표 사이 직선 거리(m) - Haversine
@@ -160,7 +124,7 @@ class RouteRecommender {
   }
 
   // ---------------------------------------------------------------------------
-  // 5) 최종 판단 규칙 (Decision Rule)
+  // 4) 최종 판단 규칙 (Decision Rule)
   //
   //    T_bus_total = T_wait + T_travel
   //    if (T_bus_total <= T_limit)  -> 버스
@@ -176,7 +140,7 @@ class RouteRecommender {
     required int waitingCount, // N_wait
     required int failedBusCount, // K
     int? waitMinutes, // T_wait (추천 버스 없으면 null)
-    int? travelMinutes, // T_travel
+    int? travelMinutes, // T_travel, home_screen.dart에서 계산한 버스 이동 시간
     int? walkMinutes, // T_walk (GPS 없으면 null)
     int? limitMinutes, // T_limit (수업 없으면 null)
   }) {

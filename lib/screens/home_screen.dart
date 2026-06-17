@@ -8,6 +8,16 @@ import 'route_recommendation.dart';
 
 enum TransportMode { none, bus, walk }
 
+class BusRouteOption {
+  final int travelMinutes;
+  final String routeText;
+
+  const BusRouteOption({
+    required this.travelMinutes,
+    required this.routeText,
+  });
+}
+
 class HomeScreen extends StatefulWidget {
   final int? userId;
   final int refreshVersion;
@@ -42,16 +52,141 @@ class _HomeScreenState extends State<HomeScreen> {
     '국제학관': {'lat': 37.239856, 'lng': 127.081200},
   };
 
-  static const Map<String, String> buildingToStation = {
-    '공학관': '전정대',
-    '외국어대학관': '외대',
-    '체육대학관': '전정대',
-    '멀티미디어교육관': '외대',
-    '생명과학대학관': '전정대',
-    '전자정보대학관': '전정대',
-    '예술디자인대학관': '외대',
-    '국제학관': '정문',
+  static const Map<String, List<String>> walkingOnlyBuildingsByStation = {
+    '정문': [
+      '공학관',
+    ],
+    '외대': [
+      '외국어대학관',
+      '멀티미디어교육관',
+    ],
+    '전정대': [
+      '전자정보대학관',
+      '예술디자인대학관',
+      '국제학관',
+    ],
   };
+
+  static const Map<String, Map<String, BusRouteOption>>
+  busRouteOptionsByStationAndBuilding = {
+    // 교내 진입 방향: 정문 → 외대 → 생대1 → 사색의 광장
+    '정문': {
+      '외국어대학관': BusRouteOption(
+        travelMinutes: 1,
+        routeText: '외대 정류장 하차',
+      ),
+
+      // 정문 → 외대 정류장 1분 + 외대 정류장 → 멀관 도보 3분
+      '멀티미디어교육관': BusRouteOption(
+        travelMinutes: 4,
+        routeText: '외대 정류장 하차 후 도보 3분',
+      ),
+
+      '생명과학대학관': BusRouteOption(
+        travelMinutes: 3,
+        routeText: '생대1 정류장 하차',
+      ),
+
+      // 정문 → 사색의 광장 5분 + 사색의 광장 → 전정대 도보 3분
+      '전자정보대학관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '사색의 광장 하차 후 도보 3분',
+      ),
+
+      // 정문 → 사색의 광장 5분 + 사색의 광장 → 예대 도보 4분
+      '예술디자인대학관': BusRouteOption(
+        travelMinutes: 9,
+        routeText: '사색의 광장 하차 후 도보 4분',
+      ),
+
+      // 정문 → 사색의 광장 5분 + 사색의 광장 → 국제대 도보 3분
+      '국제학관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '사색의 광장 하차 후 도보 3분',
+      ),
+
+      // 정문 → 체대는 외대에서 내려 걸어가는 우회 경로
+      // 정확한 도보 시간이 정해지면 8을 수정하면 됨
+      '체육대학관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '외대 정류장 하차 후 도보',
+      ),
+
+      // 정문 → 공학관은 넣지 않음
+      // walkingOnlyBuildingsByStation에서 무조건 도보 처리
+    },
+
+    // 외대 출발: 외대/멀관은 walkingOnly에서 도보 처리
+    '외대': {
+      '생명과학대학관': BusRouteOption(
+        travelMinutes: 2,
+        routeText: '생대1 정류장 하차',
+      ),
+
+      // 외대 → 사색의 광장 4분 + 사색의 광장 → 전정대 도보 3분
+      '전자정보대학관': BusRouteOption(
+        travelMinutes: 7,
+        routeText: '사색의 광장 하차 후 도보 3분',
+      ),
+
+      // 외대 → 사색의 광장 4분 + 사색의 광장 → 예대 도보 4분
+      '예술디자인대학관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '사색의 광장 하차 후 도보 4분',
+      ),
+
+      // 외대 → 사색의 광장 4분 + 사색의 광장 → 국제대 도보 3분
+      '국제학관': BusRouteOption(
+        travelMinutes: 7,
+        routeText: '사색의 광장 하차 후 도보 3분',
+      ),
+    },
+
+    // 교내 나가는 방향: 전정대 → 생대2 → 체대
+    '전정대': {
+      '생명과학대학관': BusRouteOption(
+        travelMinutes: 2,
+        routeText: '생대2 정류장 하차',
+      ),
+
+      '체육대학관': BusRouteOption(
+        travelMinutes: 4,
+        routeText: '체대 정류장 하차',
+      ),
+
+      // 전정대 → 체대 4분 + 체대 → 공학관 도보 5분
+      '공학관': BusRouteOption(
+        travelMinutes: 9,
+        routeText: '체대 정류장 하차 후 도보 5분',
+      ),
+
+      // 전정대 → 외대/멀관은 체대에서 내려 걸어가는 우회 경로
+      // 아직 정확한 도보 시간이 없으면 기존 추정값 유지
+      '외국어대학관': BusRouteOption(
+        travelMinutes: 9,
+        routeText: '체대 정류장 하차 후 도보',
+      ),
+
+      '멀티미디어교육관': BusRouteOption(
+        travelMinutes: 8,
+        routeText: '체대 정류장 하차 후 도보',
+      ),
+    },
+  };
+
+  bool _isWalkingOnlyBuilding({
+    required String station,
+    required String building,
+  }) {
+    return walkingOnlyBuildingsByStation[station]?.contains(building) == true;
+  }
+
+  BusRouteOption? _busRouteOptionToBuilding({
+    required String station,
+    required String building,
+  }) {
+    return busRouteOptionsByStationAndBuilding[station]?[building];
+  }
 
   static const double nearStationThresholdMeters = 50.0;
 
@@ -721,20 +856,72 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _updateRecommendation(String station) async {
-    int? travel;
     final building = _nextClassBuilding;
-    final destStation = (building != null) ? buildingToStation[building] : null;
-    if (destStation != null) {
-      travel = RouteRecommender.travelMinutesBetween(station, destStation);
+
+    // 다음 수업 건물 정보가 없으면 버스 추천
+    if (building == null) {
+      if (!mounted) return;
+
+      setState(() {
+        stationData[station]?['recommend'] = '버스';
+        stationData[station]?['reason'] =
+        '다음 수업 건물 정보가 없어, 현재 선택한 정류장의 버스 도착 정보를 기준으로 안내합니다.';
+      });
+
+      return;
     }
 
+    // 1. 무조건 도보 처리하는 경우
+    // 예: 정문 → 공학관, 외대 → 외대/멀관, 전정대 → 전정대/예대/국제대
+    if (_isWalkingOnlyBuilding(station: station, building: building)) {
+      if (!mounted) return;
+
+      setState(() {
+        stationData[station]?['recommend'] = '도보';
+
+        if (station == '정문' && building == '공학관') {
+          stationData[station]?['reason'] =
+          '정문에서는 공학관 방향으로 바로 이동할 수 있는 버스 경로가 없어 도보 이동을 추천합니다.';
+        } else {
+          stationData[station]?['reason'] =
+          '다음 수업 건물이 현재 선택한 정류장 근처에 있어 도보 이동을 추천합니다.';
+        }
+      });
+
+      return;
+    }
+
+    // 2. 출발 정류장에서 다음 수업 건물까지 이용 가능한 버스 경로 확인
+    final routeOption = _busRouteOptionToBuilding(
+      station: station,
+      building: building,
+    );
+
+    // 3. 버스 경로가 없으면 도보 추천
+    if (routeOption == null) {
+      if (!mounted) return;
+
+      setState(() {
+        stationData[station]?['recommend'] = '도보';
+        stationData[station]?['reason'] =
+        '현재 선택한 정류장에서는 다음 수업 건물 방향으로 이용할 수 있는 버스 경로가 없어 도보 이동을 추천합니다.';
+      });
+
+      return;
+    }
+
+    // 4. 버스 경로가 있으면 탑승 예측 계산
     int? wait;
     int failedBus = 0;
     int waitingCount = 0;
+
     final prediction = await _calculateBoardingPrediction(station);
+
     if (prediction != null) {
       waitingCount = prediction['waitingCountAtStart'] as int? ?? 0;
+
       final rec = prediction['recommendedBus'] as Map<String, dynamic>?;
+
       if (rec != null) {
         wait = (rec['arrivalMinute'] as num?)?.toInt();
         failedBus = ((rec['arrivalOrder'] as int?) ?? 1) - 1;
@@ -745,15 +932,22 @@ class _HomeScreenState extends State<HomeScreen> {
       waitingCount: waitingCount,
       failedBusCount: failedBus,
       waitMinutes: wait,
-      travelMinutes: travel,
+      travelMinutes: routeOption.travelMinutes,
       walkMinutes: _walkMinutesToDestination(),
       limitMinutes: _nextClassRemainMinute,
     );
 
     if (!mounted) return;
+
     setState(() {
       stationData[station]?['recommend'] = decision.isBus ? '버스' : '도보';
-      stationData[station]?['reason'] = decision.reason; // ← reason 저장
+
+      if (decision.isBus) {
+        stationData[station]?['reason'] =
+        '${routeOption.routeText} 기준의 이동 시간 ${routeOption.travelMinutes}분과 버스 대기 시간을 함께 계산해, 버스 이동을 추천합니다.';
+      } else {
+        stationData[station]?['reason'] = decision.reason;
+      }
     });
   }
 
