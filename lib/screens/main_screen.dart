@@ -134,7 +134,11 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     final List<Widget> screens = [
-      HomeScreen(userId: currentUserId, refreshVersion: homeRefreshVersion),
+      HomeScreen(
+        userId: currentUserId,
+        refreshVersion: homeRefreshVersion,
+        isActive: selectedIndex == 0,
+      ),
       ReservationScreen(
         key: ValueKey(currentUserId),
         userId: currentUserId,

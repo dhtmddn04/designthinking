@@ -159,7 +159,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
             const SizedBox(height: 32),
 
             const Text(
-              '정류장 선택',
+              '출발 정류장 선택',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,

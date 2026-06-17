@@ -21,8 +21,14 @@ class BusRouteOption {
 class HomeScreen extends StatefulWidget {
   final int? userId;
   final int refreshVersion;
+  final bool isActive;
 
-  const HomeScreen({super.key, required this.userId, this.refreshVersion = 0});
+  const HomeScreen({
+    super.key,
+    required this.userId,
+    this.refreshVersion = 0,
+    this.isActive = true,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -197,6 +203,69 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _waitingCountTimer;
   bool _isOpeningPrediction = false;
 
+  // ──────────────────────────────────────────────
+  // 원터치 혼잡도 제보
+  // ──────────────────────────────────────────────
+  static const List<_QuickCongestionOption> _quickReportOptions = [
+    _QuickCongestionOption(
+      level: '여유',
+      label: '여유',
+      icon: Icons.sentiment_very_satisfied_rounded,
+      bgColor: Color(0xFFECFDF5),
+      borderColor: Color(0xFFA7F3D0),
+      iconBgColor: Color(0xFFD1FAE5),
+      iconColor: Color(0xFF10B981),
+      textColor: Color(0xFF047857),
+      dotColor: Color(0xFF34D399),
+    ),
+    _QuickCongestionOption(
+      level: '보통',
+      label: '보통',
+      icon: Icons.sentiment_satisfied_alt_rounded,
+      bgColor: Color(0xFFEFF6FF),
+      borderColor: Color(0xFFBFDBFE),
+      iconBgColor: Color(0xFFDBEAFE),
+      iconColor: Color(0xFF2563EB),
+      textColor: Color(0xFF1D4ED8),
+      dotColor: Color(0xFF60A5FA),
+    ),
+    _QuickCongestionOption(
+      level: '약간 혼잡',
+      label: '약간\n혼잡',
+      icon: Icons.sentiment_neutral_rounded,
+      bgColor: Color(0xFFFFFBEB),
+      borderColor: Color(0xFFFDE68A),
+      iconBgColor: Color(0xFFFEF3C7),
+      iconColor: Color(0xFFF59E0B),
+      textColor: Color(0xFFB45309),
+      dotColor: Color(0xFFFBBF24),
+    ),
+    _QuickCongestionOption(
+      level: '혼잡',
+      label: '혼잡',
+      icon: Icons.sentiment_very_dissatisfied_rounded,
+      bgColor: Color(0xFFFEF2F2),
+      borderColor: Color(0xFFFECACA),
+      iconBgColor: Color(0xFFFEE2E2),
+      iconColor: Color(0xFFEF4444),
+      textColor: Color(0xFFB91C1C),
+      dotColor: Color(0xFFF87171),
+    ),
+  ];
+
+  static const Duration _quickReportCooldown = Duration(minutes: 5);
+
+// 사용자별 마지막 원터치 제보 시간
+  static final Map<int, DateTime> _lastQuickReportedAtByUser = {};
+
+  // 정류장별로 "다음에 다시 팝업을 띄울 수 있는 시간" 저장
+  final Map<String, DateTime> _quickReportSnoozedUntilByStation = {};
+
+  Timer? _quickReportPromptTimer;
+
+  bool _isQuickReportSheetOpen = false;
+  bool _isSubmittingQuickReport = false;
+
   List<Map<String, dynamic>> _schedules = [];
   String _classTimeText = '-';
   String _nextClassText = '-';
@@ -299,6 +368,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     _waitingCountTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _loadWaitingCount();
+    });
+    _quickReportPromptTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _maybeShowQuickReportSheet();
     });
     _scheduleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       _updateNextClassText();
@@ -424,9 +496,21 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+
     if (oldWidget.userId != widget.userId ||
         oldWidget.refreshVersion != widget.refreshVersion) {
       _loadSchedules();
+    }
+
+    final bool becameActive = !oldWidget.isActive && widget.isActive;
+    final bool loginChangedWhileHomeActive =
+        oldWidget.userId != widget.userId && widget.isActive;
+
+    if (becameActive || loginChangedWhileHomeActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _maybeShowQuickReportSheet();
+      });
     }
   }
 
@@ -436,6 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _scheduleTimer?.cancel();
     _busTimetableTimer?.cancel();
     _waitingCountTimer?.cancel();
+    _quickReportPromptTimer?.cancel();
     _positionSubscription?.cancel();
     super.dispose();
   }
@@ -460,6 +545,61 @@ class _HomeScreenState extends State<HomeScreen> {
   bool get canSelectTransportMode =>
       activeStation == null || activeStation == selectedStation;
 
+  DateTime? get _lastQuickReportedAt {
+    final userId = widget.userId;
+    if (userId == null) return null;
+
+    return _lastQuickReportedAtByUser[userId];
+  }
+
+  Duration get _remainingQuickReportCooldown {
+    final lastReportedAt = _lastQuickReportedAt;
+
+    if (lastReportedAt == null) return Duration.zero;
+
+    final elapsed = DateTime.now().difference(lastReportedAt);
+
+    if (elapsed >= _quickReportCooldown) {
+      return Duration.zero;
+    }
+
+    return _quickReportCooldown - elapsed;
+  }
+
+  bool get _canQuickReport => _remainingQuickReportCooldown == Duration.zero;
+
+  String get _quickReportCooldownText {
+    final remaining = _remainingQuickReportCooldown;
+    final minutes = remaining.inMinutes;
+    final seconds = remaining.inSeconds % 60;
+
+    if (minutes > 0) {
+      return '$minutes분 $seconds초';
+    }
+
+    return '$seconds초';
+  }
+
+  bool _isQuickReportSnoozed(String stationName) {
+    final snoozedUntil = _quickReportSnoozedUntilByStation[stationName];
+
+    if (snoozedUntil == null) return false;
+
+    return DateTime.now().isBefore(snoozedUntil);
+  }
+
+  bool get _shouldShowQuickReportPrompt {
+    if (!widget.isActive) return false; // 홈 탭이 실제로 보일 때만 표시
+    if (widget.userId == null) return false;
+    if (_isWeekend) return false;
+    if (!isNearStation) return false;
+    if (!_canQuickReport) return false;
+    if (_isQuickReportSheetOpen) return false;
+    if (_isQuickReportSnoozed(selectedStation)) return false;
+
+    return true;
+  }
+
   String get _locationStatusText {
     if (!_locationPermissionGranted) return '📍 위치 권한이 필요합니다';
     if (_currentPosition == null) return '📍 위치 정보를 가져오는 중...';
@@ -480,6 +620,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool get isNearStation {
+    return true; // 테스트용
+  }
+/*
+  bool get isNearStation {
     if (!_locationPermissionGranted || _currentPosition == null) return false;
     final coords = stationCoordinates[selectedStation];
     if (coords == null) return false;
@@ -490,7 +634,7 @@ class _HomeScreenState extends State<HomeScreen> {
       coords['lng']!,
     );
     return distance <= nearStationThresholdMeters;
-  }
+  } */
 
   double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
     const earthRadius = 6371000.0;
@@ -541,6 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (!mounted) return;
       setState(() { _currentPosition = position; });
+      _maybeShowQuickReportSheet();
     } catch (_) {}
 
     _positionSubscription = Geolocator.getPositionStream(
@@ -552,16 +697,25 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (position.accuracy > 50) return;
       setState(() { _currentPosition = position; });
+      _maybeShowQuickReportSheet();
     });
   }
 
   void _changeStation(String station) {
     setState(() { selectedStation = station; });
+
     _loadCongestionSummaries();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _maybeShowQuickReportSheet();
+    });
+
     if (_isWeekend) {
       _applyWeekendNoBusInfo(station);
       return;
     }
+
     if (station == '전정대') {
       _loadJeonjeongdaeBusTimetable();
     } else if (station == '정문' || station == '외대') {
@@ -1050,6 +1204,433 @@ class _HomeScreenState extends State<HomeScreen> {
     final busOrder = (myWaitingNumber! / busCapacity).ceil();
     if (busOrder <= 1) return '다음 버스';
     return '$busOrder번째 버스';
+  }
+
+  void _maybeShowQuickReportSheet() {
+    if (!_shouldShowQuickReportPrompt) return;
+
+    final stationName = selectedStation;
+
+    unawaited(_showQuickReportSheet(stationName));
+  }
+
+  Widget _buildQuickReportFaceIcon() {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: const Color(0xFFBFDBFE),
+          width: 1.2,
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: 13,
+            left: 12,
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: const BoxDecoration(
+                color: Color(0xFF2563EB),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 13,
+            right: 12,
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: const BoxDecoration(
+                color: Color(0xFF2563EB),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 12,
+            child: Container(
+              width: 16,
+              height: 7,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickReportOptionCard({
+    required _QuickCongestionOption option,
+    required String stationName,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: _isSubmittingQuickReport
+            ? null
+            : () {
+          _submitQuickReport(
+            stationName: stationName,
+            congestionLevel: option.level,
+          );
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          height: 112,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+          decoration: BoxDecoration(
+            color: option.bgColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: option.borderColor,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: option.iconColor.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: option.iconBgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  option.icon,
+                  color: option.iconColor,
+                  size: 27,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                option.label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: option.textColor,
+                  height: 1.15,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: option.dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showQuickReportSheet(String stationName) async {
+    if (widget.userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그인이 필요합니다.')),
+      );
+      return;
+    }
+
+    if (_isWeekend) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('주말에는 혼잡도 제보를 이용할 수 없습니다.')),
+      );
+      return;
+    }
+
+    if (!isNearStation) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('정류장 50m 이내에서만 제보할 수 있어요.')),
+      );
+      return;
+    }
+
+    if (!_canQuickReport) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$_quickReportCooldownText 후 다시 제보할 수 있어요.')),
+      );
+      return;
+    }
+
+    if (_isQuickReportSheetOpen) return;
+
+    setState(() {
+      _isQuickReportSheetOpen = true;
+    });
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 18,
+                  offset: Offset(0, -6),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5E7EB),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _buildQuickReportFaceIcon(),
+
+                      const SizedBox(width: 12),
+
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '지금 $stationName의 상태는 어떤가요?',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF111827),
+                                height: 1.25,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              '실시간 혼잡도 제보에 도움이 됩니다',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _quickReportSnoozedUntilByStation[stationName] =
+                                DateTime.now().add(_quickReportCooldown);
+                          });
+
+                          Navigator.pop(bottomSheetContext);
+                        },
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF3F4F6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 20,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Row(
+                    children: [
+                      for (int i = 0; i < _quickReportOptions.length; i++) ...[
+                        _buildQuickReportOptionCard(
+                          option: _quickReportOptions[i],
+                          stationName: stationName,
+                        ),
+                        if (i != _quickReportOptions.length - 1)
+                          const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _quickReportSnoozedUntilByStation[stationName] =
+                              DateTime.now().add(_quickReportCooldown);
+                        });
+
+                        Navigator.pop(bottomSheetContext);
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        foregroundColor: const Color(0xFF6B7280),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        '나중에 할게요',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isQuickReportSheetOpen = false;
+    });
+  }
+
+  Future<void> _submitQuickReport({
+    required String stationName,
+    required String congestionLevel,
+  }) async {
+    final userId = widget.userId;
+
+    if (userId == null) return;
+    if (_isSubmittingQuickReport) return;
+
+    setState(() {
+      _isSubmittingQuickReport = true;
+    });
+
+    try {
+      final result = await ApiService.submitOpinion(
+        userId: userId,
+        stopName: stationName,
+        congestionLevel: congestionLevel,
+        comment: null,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        Navigator.pop(context);
+
+        setState(() {
+          _lastQuickReportedAtByUser[userId] = DateTime.now();
+        });
+
+        await _loadCongestionSummaries();
+
+        if (mounted) {
+          await _updateRecommendation(stationName);
+        }
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '[$stationName] $congestionLevel 제보가 탑승 예상에 반영되었어요.',
+            ),
+            backgroundColor: const Color(0xFF2563EB),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? '제보 저장에 실패했습니다.'),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('서버에 연결할 수 없습니다.'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmittingQuickReport = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadCongestionSummaries() async {
@@ -2051,4 +2632,27 @@ class _ReasonBadgeState extends State<_ReasonBadge> {
       ),
     );
   }
+}
+class _QuickCongestionOption {
+  final String level;
+  final String label;
+  final IconData icon;
+  final Color bgColor;
+  final Color borderColor;
+  final Color iconBgColor;
+  final Color iconColor;
+  final Color textColor;
+  final Color dotColor;
+
+  const _QuickCongestionOption({
+    required this.level,
+    required this.label,
+    required this.icon,
+    required this.bgColor,
+    required this.borderColor,
+    required this.iconBgColor,
+    required this.iconColor,
+    required this.textColor,
+    required this.dotColor,
+  });
 }
