@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 
 // ─────────────────────────────────────────────
@@ -485,7 +486,6 @@ class _LoginViewState extends State<LoginView> {
 // ─────────────────────────────────────────────
 // 회원가입 화면
 // ─────────────────────────────────────────────
-
 class SignupView extends StatefulWidget {
   final VoidCallback onBackToLogin;
 
@@ -500,7 +500,10 @@ class _SignupViewState extends State<SignupView> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordConfirmController =
       TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+
+  final TextEditingController _phoneMiddleController = TextEditingController();
+  final TextEditingController _phoneLastController = TextEditingController();
+  final FocusNode _phoneLastFocusNode = FocusNode();
 
   bool _needsWheelchair = true;
 
@@ -509,8 +512,51 @@ class _SignupViewState extends State<SignupView> {
     _usernameController.dispose();
     _passwordController.dispose();
     _passwordConfirmController.dispose();
-    _phoneController.dispose();
+    _phoneMiddleController.dispose();
+    _phoneLastController.dispose();
+    _phoneLastFocusNode.dispose();
     super.dispose();
+  }
+
+  Widget _buildPhonePartField({
+    required TextEditingController controller,
+    required String hintText,
+    FocusNode? focusNode,
+    void Function(String)? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      maxLength: 4,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(4),
+      ],
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        counterText: '',
+        hintText: hintText,
+        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.7),
+        ),
+      ),
+    );
   }
 
   @override
@@ -569,10 +615,67 @@ class _SignupViewState extends State<SignupView> {
 
               _buildLabel('휴대전화'),
               const SizedBox(height: 8),
-              _buildTextField(
-                controller: _phoneController,
-                hintText: '010-1234-5678',
-                keyboardType: TextInputType.phone,
+              Row(
+                children: [
+                  Container(
+                    width: 70,
+                    height: 49,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                    ),
+                    child: const Text(
+                      '010',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '-',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPhonePartField(
+                      controller: _phoneMiddleController,
+                      hintText: '1234',
+                      onChanged: (value) {
+                        if (value.length == 4) {
+                          _phoneLastFocusNode.requestFocus();
+                        }
+                      },
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '-',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPhonePartField(
+                      controller: _phoneLastController,
+                      hintText: '5678',
+                      focusNode: _phoneLastFocusNode,
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 18),
@@ -617,14 +720,24 @@ class _SignupViewState extends State<SignupView> {
                   final password = _passwordController.text.trim();
                   final passwordConfirm = _passwordConfirmController.text
                       .trim();
-                  final phone = _phoneController.text.trim();
+                  final phoneMiddle = _phoneMiddleController.text.trim();
+                  final phoneLast = _phoneLastController.text.trim();
+                  final phone = '010-$phoneMiddle-$phoneLast';
 
                   if (username.isEmpty ||
                       password.isEmpty ||
                       passwordConfirm.isEmpty ||
-                      phone.isEmpty) {
+                      phoneMiddle.isEmpty ||
+                      phoneLast.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('모든 정보를 입력해주세요.')),
+                    );
+                    return;
+                  }
+
+                  if (phoneMiddle.length != 4 || phoneLast.length != 4) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('휴대전화 번호는 4자리씩 입력해주세요.')),
                     );
                     return;
                   }

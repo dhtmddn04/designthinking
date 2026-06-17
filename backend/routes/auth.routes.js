@@ -16,6 +16,15 @@ router.post('/signup', async (req, res) => {
     });
   }
 
+  const phoneRegex = /^010-\d{4}-\d{4}$/;
+
+  if (!phoneRegex.test(normalizedPhone)) {
+    return res.status(400).json({
+      success: false,
+      message: '휴대전화 번호는 010-0000-0000 형식으로 입력해주세요.',
+    });
+  }
+
   try {
     const [existingUsers] = await db.query(
       'SELECT id FROM users WHERE username = ?',
