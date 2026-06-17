@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math';
+import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 
 // ──────────────────────────────────────────────
@@ -8,8 +10,15 @@ import '../services/api_service.dart';
 const List<String> _locations = ['정문', '외대', '전정대'];
 const List<String> _congestionLevels = ['여유', '보통', '약간 혼잡', '혼잡'];
 const List<String> _tabLabels = ['정문', '외대', '전정대'];
-const Duration _cooldown = Duration(hours: 1);
+const Duration _cooldown = Duration(minutes: 5);
 
+const Map<String, Map<String, double>> _stationCoordinates = {
+  '정문': {'lat': 37.2475167, 'lng': 127.0779039},
+  '외대': {'lat': 37.24512, 'lng': 127.078460},
+  '전정대': {'lat': 37.24051, 'lng': 127.0825},
+};
+
+const double _nearStationThresholdMeters = 50.0;
 // ──────────────────────────────────────────────
 //  StatefulWidget
 // ──────────────────────────────────────────────
@@ -30,6 +39,12 @@ class _OpinionScreenState extends State<OpinionScreen>
   // ── 드롭다운 선택 상태 (null = 미선택) ──────
   String? _selectedLocation;
   String? _selectedCongestion;
+  StreamSubscription<Position>? _positionSubscription;
+  Position? _currentPosition;
+  bool _locationPermissionGranted = false;
+
+  // 근처 정류장으로 테스트 해보고 싶다면 true / 테스트 끝나면 false
+  static const bool _useTestNearStation = false; // 테스트 끝나면 false로 변경
 
   bool get _isWeekend {
     final now = DateTime.now();
@@ -77,6 +92,7 @@ class _OpinionScreenState extends State<OpinionScreen>
     super.initState();
 
     _loadOpinionSummaries();
+    _initLocation();
 
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_canReport) setState(() {});
@@ -91,6 +107,7 @@ class _OpinionScreenState extends State<OpinionScreen>
   void dispose() {
     _ticker?.cancel();
     _summaryTimer?.cancel();
+    _positionSubscription?.cancel();
     super.dispose();
   }
 
@@ -110,6 +127,156 @@ class _OpinionScreenState extends State<OpinionScreen>
     final s = r.inSeconds % 60;
     if (m > 0) return '$m분 $s초';
     return '$s초';
+  }
+
+  double _toRad(double deg) => deg * pi / 180;
+
+  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+    const earthRadius = 6371000.0;
+
+    final dLat = _toRad(lat2 - lat1);
+    final dLng = _toRad(lng2 - lng1);
+
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRad(lat1)) *
+            cos(_toRad(lat2)) *
+            sin(dLng / 2) *
+            sin(dLng / 2);
+
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  bool get _isNearSelectedLocation {
+    final location = _selectedLocation;
+
+    if (location == null) return false;
+
+    // 테스트용: 정류장을 선택하면 무조건 근처로 처리
+    if (_useTestNearStation) return true;
+
+    if (!_locationPermissionGranted || _currentPosition == null) return false;
+
+    final coords = _stationCoordinates[location];
+    if (coords == null) return false;
+
+    final distance = _calculateDistance(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      coords['lat']!,
+      coords['lng']!,
+    );
+
+    return distance <= _nearStationThresholdMeters;
+  }
+
+  String get _locationStatusText {
+    if (_selectedLocation == null) {
+      return '제보할 정류장을 선택하면 현재 위치와의 거리를 확인할 수 있어요.';
+    }
+
+    // 테스트용: 선택한 정류장 근처로 처리
+    if (_useTestNearStation) {
+      return '테스트 모드: 현재 $_selectedLocation 정류장 근처로 처리 중입니다.\n제보할 수 있어요. (0m)';
+    }
+
+    if (!_locationPermissionGranted) {
+      return '현재 위치를 확인할 수 없어요. 위치 권한과 GPS 설정을 확인해 주세요.';
+    }
+
+    if (_currentPosition == null) {
+      return '현재 위치를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.';
+    }
+
+    final coords = _stationCoordinates[_selectedLocation];
+    if (coords == null) {
+      return '정류장 위치 정보를 확인할 수 없어요.';
+    }
+
+    final distance = _calculateDistance(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      coords['lat']!,
+      coords['lng']!,
+    );
+
+    final distanceText = distance < 1000
+        ? '${distance.toStringAsFixed(0)}m'
+        : '${(distance / 1000).toStringAsFixed(1)}km';
+
+    if (distance <= _nearStationThresholdMeters) {
+      return '현재 $_selectedLocation 정류장 근처입니다. 제보할 수 있어요. ($distanceText)';
+    }
+
+    return '정류장 50m 이내에서만 제보할 수 있어요.\n현재 거리: $distanceText';
+  }
+
+  bool get _canReportByLocation {
+    if (_useTestNearStation) {
+      return _selectedLocation != null;
+    }
+
+    return _selectedLocation != null &&
+        _locationPermissionGranted &&
+        _currentPosition != null &&
+        _isNearSelectedLocation;
+  }
+
+  Future<void> _initLocation() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+    if (!serviceEnabled) {
+      if (!mounted) return;
+      setState(() {
+        _locationPermissionGranted = false;
+      });
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      if (!mounted) return;
+      setState(() {
+        _locationPermissionGranted = false;
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _locationPermissionGranted = true;
+    });
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = position;
+      });
+    } catch (_) {}
+
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 0,
+      ),
+    ).listen((position) {
+      if (!mounted) return;
+
+      setState(() {
+        _currentPosition = position;
+      });
+    });
   }
 
   void _showWeekendReportDialog() {
@@ -171,6 +338,34 @@ class _OpinionScreenState extends State<OpinionScreen>
       return;
     }
 
+    if (_currentPosition == null && _locationPermissionGranted) {
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _currentPosition = position;
+        });
+      } catch (_) {}
+    }
+
+    if (!_isNearSelectedLocation) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_locationStatusText),
+          backgroundColor: const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
     if (!_canReport) {
       _showCooldownDialog();
       return;
@@ -205,7 +400,7 @@ class _OpinionScreenState extends State<OpinionScreen>
           SnackBar(
             content: Text(
               '[$_selectedLocation] $_selectedCongestion 제보 완료!\n'
-              '1시간 후 다시 제보할 수 있어요.',
+              '5분 후 다시 제보할 수 있어요.',
             ),
             backgroundColor: _primary,
             behavior: SnackBarBehavior.floating,
@@ -283,7 +478,7 @@ class _OpinionScreenState extends State<OpinionScreen>
           ],
         ),
         content: Text(
-          '제보는 1시간에 한 번만 가능해요.\n\n⏱ $_cooldownText 후 제보 가능합니다',
+          '제보는 정류장 근처에서 5분에 한 번만 가능해요.\n\n⏱ $_cooldownText 후 제보 가능합니다',
           style: const TextStyle(fontSize: 14, height: 1.6),
         ),
         actions: [
@@ -322,7 +517,7 @@ class _OpinionScreenState extends State<OpinionScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
-    final bool canSubmitNow = !_isWeekend && _canReport;
+    final bool canSubmitNow = !_isWeekend && _canReport && _isNearSelectedLocation;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -335,7 +530,7 @@ class _OpinionScreenState extends State<OpinionScreen>
               const Padding(
                 padding: const EdgeInsets.fromLTRB(20, 44, 20, 0),
                 child: Text(
-                  '실시간 혼잡도 제보',
+                  '실시간 체감 혼잡도 제보',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w700,
@@ -348,7 +543,7 @@ class _OpinionScreenState extends State<OpinionScreen>
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  '실제 정류장의 혼잡도를 제보해 주세요.',
+                  '실제 정류장에서 느낀 혼잡도를 제보해 주세요.',
                   style: TextStyle(fontSize: 14, color: _textGray),
                 ),
               ),
@@ -409,6 +604,11 @@ class _OpinionScreenState extends State<OpinionScreen>
                   ],
                 ),
               ),
+
+              const SizedBox(height: 12),
+
+              _buildLocationStatusBox(),
+
               const SizedBox(height: 16),
 
               // ── 제보하기 버튼 ──────────────
@@ -422,17 +622,21 @@ class _OpinionScreenState extends State<OpinionScreen>
                     icon: Icon(
                       _isWeekend
                           ? Icons.block
-                          : _canReport
-                          ? Icons.play_arrow
-                          : Icons.lock_clock,
+                          : !_canReport
+                            ? Icons.lock_clock
+                            : !_isNearSelectedLocation
+                              ? Icons.location_on_outlined
+                              : Icons.play_arrow,
                       size: 20,
                     ),
                     label: Text(
                       _isWeekend
                           ? '제보 불가'
-                          : _canReport
-                          ? '제보하기'
-                          : '$_cooldownText 후 제보 가능합니다',
+                          : !_canReport
+                            ? '$_cooldownText 후 제보 가능합니다'
+                            : !_isNearSelectedLocation
+                              ? '정류장 근처에서 제보 가능'
+                              : '제보하기',
                       style: TextStyle(
                         fontSize: canSubmitNow ? 16 : 13,
                         fontWeight: FontWeight.w700,
@@ -452,7 +656,6 @@ class _OpinionScreenState extends State<OpinionScreen>
                 ),
               ),
               const SizedBox(height: 32),
-
               // ── 실시간 제보 현황 헤더 ──────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -607,14 +810,103 @@ class _OpinionScreenState extends State<OpinionScreen>
               const SizedBox(
                 width: double.infinity,
                 child: Text(
-                  '* 데이터는 최근 5분 이내 학생들 제보를 기반으로 합니다.',
+                  '* 데이터는 최근 5분 이내 학생들의 체감 혼잡도 제보를 기반으로 합니다.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
                 ),
               ),
+
+              const SizedBox(height: 12),
+
+// ── CCTV 보완 안내 박스 ─
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9FAFB),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 18,
+                        color: Color(0xFF6B7280),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '체감 혼잡도 제보는 CCTV 대기 인원을 보완해 탑승 예상 계산에 사용됩니다.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 32),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationStatusBox() {
+    final bool canReportHere = _canReportByLocation;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: canReportHere
+              ? const Color(0xFFEFFDF4)
+              : const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: canReportHere
+                ? const Color(0xFFBBF7D0)
+                : const Color(0xFFFDE68A),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              canReportHere
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.location_on_outlined,
+              size: 18,
+              color: canReportHere
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFF59E0B),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _locationStatusText,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
+                  color: canReportHere
+                      ? const Color(0xFF166534)
+                      : const Color(0xFF92400E),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
