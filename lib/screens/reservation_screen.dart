@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 import 'dart:async';
 
 class ReservationScreen extends StatefulWidget {
@@ -30,6 +31,21 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   Timer? _reservationTimer;
+
+  String _stopDisplayName(String stop) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (stop) {
+      case '정문':
+        return l10n.mainGateStation;
+      case '외대':
+        return l10n.oedaeStation;
+      case '전정대':
+        return l10n.jeonjeongdaeStation;
+      default:
+        return stop;
+    }
+  }
 
   @override
   void initState() {
@@ -107,11 +123,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
         });
       }
     } catch (e) {
-      if (!context.mounted) return;
+      //if (!context.mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('예약 내역을 불러올 수 없습니다.')));
+      //final l10n = AppLocalizations.of(context)!;
+
+      //ScaffoldMessenger.of(
+      //  context,
+      //).showSnackBar(SnackBar(content: Text(l10n.reservationLoadFailed)));
     }
   }
 
@@ -129,6 +147,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: Colors.white,
       child: Padding(
@@ -136,9 +156,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '예약',
-              style: TextStyle(
+            Text(
+              l10n.reservationTab,
+              style: const TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827),
@@ -147,9 +167,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
             const SizedBox(height: 8),
 
-            const Text(
-              '휠체어 사용자를 위한 지원 기능입니다.',
-              style: TextStyle(
+            Text(
+              l10n.reservationSubtitle,
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 color: Color(0xFF6B7280),
@@ -158,9 +178,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
             const SizedBox(height: 32),
 
-            const Text(
-              '출발 정류장 선택',
-              style: TextStyle(
+            Text(
+              l10n.departureStation,
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF374151),
@@ -201,7 +221,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: Text(
-                        stop,
+                        _stopDisplayName(stop),
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -217,10 +237,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
             Expanded(
               child: selectedStop == null
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        '정류장을 선택해주세요',
-                        style: TextStyle(
+                        l10n.pleaseSelectStop,
+                        style: const TextStyle(
                           fontSize: 16,
                           color: Color(0xFF99A1AF),
                         ),
@@ -235,21 +255,23 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showInvalidTimeDialog() {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
-            '예약 불가',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          title: Text(
+            l10n.reservationNotAvailableTitle,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          content: const Text('예약 가능한 시간이 아닙니다.'),
+          content: Text(l10n.invalidReservationTime),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text('확인'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -258,21 +280,23 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showAlreadyReservedDialog() {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
-            '예약 불가',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          title: Text(
+            l10n.reservationNotAvailableTitle,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          content: const Text('이미 예약된 시간대입니다.'),
+          content: Text(l10n.alreadyReservedTime),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text('확인'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -281,21 +305,23 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showAlreadyHasReservationDialog() {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
-            '예약 불가',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          title: Text(
+            l10n.reservationNotAvailableTitle,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          content: const Text('이미 예약한 시간이 있습니다.'),
+          content: Text(l10n.alreadyHasReservation),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text('확인'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -304,21 +330,23 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showAlreadyHasSameTimeReservationDialog() {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
-            '예약 불가',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          title: Text(
+            l10n.reservationNotAvailableTitle,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          content: const Text('이미 같은 시간에 다른 정류장 예약이 있습니다.'),
+          content: Text(l10n.alreadyHasSameTimeReservation),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text('확인'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -327,21 +355,23 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showNotAllowedDialog() {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
-            '예약 불가',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          title: Text(
+            l10n.reservationNotAvailableTitle,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          content: const Text('예약 기능 이용 대상자가 아닙니다.'),
+          content: Text(l10n.notReservationTarget),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text('확인'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -350,6 +380,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showWeekendReservationDialog() {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (context) {
@@ -357,15 +389,15 @@ class _ReservationScreenState extends State<ReservationScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            '예약 불가',
-            style: TextStyle(fontWeight: FontWeight.w800),
+          title: Text(
+            l10n.reservationNotAvailableTitle,
+            style: const TextStyle(fontWeight: FontWeight.w800),
           ),
-          content: const Text('주말에는 예약 기능을 이용할 수 없습니다.'),
+          content: Text(l10n.weekendReservationUnavailable),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('확인'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -374,10 +406,12 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   Future<void> _reserveTime(String time) async {
+    final l10n = AppLocalizations.of(context)!;
+
     if (widget.userId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
@@ -409,7 +443,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
       if (!context.mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'] ?? '예약 결과를 확인할 수 없습니다.')),
+        SnackBar(
+          content: Text(
+            result['success'] == true
+                ? l10n.reservationSuccess
+                : l10n.reservationFailed,
+          ),
+        ),
       );
 
       if (result['success'] == true) {
@@ -420,15 +460,17 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     }
   }
 
   Future<void> _cancelReservation(String time) async {
+    final l10n = AppLocalizations.of(context)!;
+
     if (widget.userId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
@@ -444,7 +486,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
       if (!context.mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'] ?? '예약 취소 결과를 확인할 수 없습니다.')),
+        SnackBar(
+          content: Text(
+            result['success'] == true
+                ? l10n.reservationCancelSuccess
+                : l10n.reservationCancelFailed,
+          ),
+        ),
       );
 
       if (result['success'] == true) {
@@ -455,11 +503,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     }
   }
 
   String _formatBoardingBusInfo(Map<String, dynamic> recommendation) {
+    final l10n = AppLocalizations.of(context)!;
+
     final boardingTime = recommendation['boardingTime'];
     final expectedArrivalTime = recommendation['expectedArrivalTime'];
     final departureTime = recommendation['departureTime'];
@@ -467,13 +517,15 @@ class _ReservationScreenState extends State<ReservationScreen> {
     final time = boardingTime ?? expectedArrivalTime ?? departureTime;
 
     if (time != null) {
-      return '9번 저상버스 ($time 예정)';
+      return l10n.lowFloorBus9Scheduled(time.toString());
     }
 
-    return '9번 저상버스';
+    return l10n.lowFloorBus9;
   }
 
   Future<void> _showTicketBottomSheet(String time) async {
+    final l10n = AppLocalizations.of(context)!;
+
     final stop = selectedStop ?? '정문';
 
     Map<String, dynamic> recommendation;
@@ -485,7 +537,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
         recommendation = {
           'success': false,
           'available': false,
-          'message': '로그인이 필요합니다.',
+          'message': l10n.loginRequired,
         };
       } else {
         recommendation = await ApiService.getBoardingRecommendation(
@@ -500,7 +552,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       recommendation = {
         'success': false,
         'available': false,
-        'message': '9번 저상버스 도착정보를 불러올 수 없습니다.',
+        'message': l10n.busArrivalInfoLoadFailed,
       };
     }
 
@@ -510,7 +562,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
     final String busInfo = available
         ? _formatBoardingBusInfo(recommendation)
-        : recommendation['message'] ?? '9번 저상버스 도착정보가 아직 없습니다.';
+        : l10n.busArrivalInfoNotReady;
 
     showModalBottomSheet(
       context: context,
@@ -558,9 +610,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
                     const SizedBox(height: 8),
 
-                    const Text(
-                      '탑승권',
-                      style: TextStyle(
+                    Text(
+                      l10n.ticketTitle,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
@@ -577,15 +629,21 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
                     const SizedBox(height: 20),
 
-                    _ticketInfoBox(label: '정류장', value: stop),
+                    _ticketInfoBox(
+                      label: l10n.stopLabel,
+                      value: _stopDisplayName(stop),
+                    ),
+                    const SizedBox(height: 12),
+
+                    _ticketInfoBox(
+                      label: l10n.boardingBusLabel,
+                      value: busInfo,
+                      valueFontSize: 13,
+                    ),
 
                     const SizedBox(height: 12),
 
-                    _ticketInfoBox(label: '이용 버스', value: busInfo, valueFontSize: 13),
-
-                    const SizedBox(height: 12),
-
-                    _ticketInfoBox(label: '강의 시간', value: time),
+                    _ticketInfoBox(label: l10n.classTimeLabel, value: time),
 
                     const SizedBox(height: 20),
 
@@ -597,9 +655,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
                     const SizedBox(height: 16),
 
-                    const Text(
-                      '탑승 5분 전까지 정류장에 도착해주세요',
-                      style: TextStyle(
+                    Text(
+                      l10n.arriveFiveMinutesEarly,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -616,6 +674,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showReservationDialog(String time) {
+    final l10n = AppLocalizations.of(context)!;
     final stop = selectedStop ?? '';
 
     showDialog(
@@ -625,12 +684,12 @@ class _ReservationScreenState extends State<ReservationScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            '예약되었습니다',
+          title: Text(
+            l10n.reservationCompletedTitle,
             style: TextStyle(fontWeight: FontWeight.w800),
           ),
           content: Text(
-            '$stop 정류장 $time 예약이 완료되었습니다.',
+            l10n.reservationCompletedMessage(_stopDisplayName(stop), time),
             style: const TextStyle(fontSize: 14, height: 1.5),
           ),
           actions: [
@@ -638,9 +697,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text(
-                '닫기',
-                style: TextStyle(
+              child: Text(
+                l10n.close,
+                style: const TextStyle(
                   color: Color(0xFF6B7280),
                   fontWeight: FontWeight.w600,
                 ),
@@ -651,9 +710,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 Navigator.pop(context);
                 _cancelReservation(time);
               },
-              child: const Text(
-                '예약 취소',
-                style: TextStyle(
+              child: Text(
+                l10n.cancelReservation,
+                style: const TextStyle(
                   color: Color(0xFFEF4444),
                   fontWeight: FontWeight.w800,
                 ),
@@ -703,29 +762,31 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   Widget _buildScheduleList() {
+    final l10n = AppLocalizations.of(context)!;
+
     return Column(
       children: [
-        const Row(
+        Row(
           children: [
             Expanded(
               child: Text(
-                '시간',
+                l10n.timeHeader,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF6B7280)),
+                style: const TextStyle(color: Color(0xFF6B7280)),
               ),
             ),
             Expanded(
               child: Text(
-                '예약',
+                l10n.reservationHeader,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF6B7280)),
+                style: const TextStyle(color: Color(0xFF6B7280)),
               ),
             ),
             Expanded(
               child: Text(
-                '탑승권',
+                l10n.reservationHeader,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF6B7280)),
+                style: const TextStyle(color: Color(0xFF6B7280)),
               ),
             ),
           ],
@@ -854,10 +915,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
                             ),
                             child: Text(
                               isMyReservation
-                                  ? '예약완료'
+                                  ? l10n.reserved
                                   : isDisabled
-                                  ? '예약불가'
-                                  : '예약하기',
+                                  ? l10n.reservationUnavailable
+                                  : l10n.makeReservation,
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -894,9 +955,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
-                            child: const Text(
-                              '탑승권',
-                              style: TextStyle(
+                            child: Text(
+                              l10n.ticket,
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),

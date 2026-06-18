@@ -240,9 +240,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      final l10n = AppLocalizations.of(context)!;
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('시간표를 불러올 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.timetableLoadFailed)));
     }
   }
 
@@ -952,6 +954,8 @@ class ProfileContentView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: const Color(0xFFF9FAFB),
       child: SafeArea(
@@ -992,9 +996,9 @@ class ProfileContentView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          '아이디',
-                          style: TextStyle(
+                        Text(
+                          l10n.username,
+                          style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF6B7280),
                           ),
@@ -1048,9 +1052,9 @@ class ProfileContentView extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Text(
-                                '프로필 정보',
-                                style: TextStyle(
+                              Text(
+                                l10n.profileInfo,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF111827),
@@ -1091,16 +1095,21 @@ class ProfileContentView extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 14),
-                          _ProfileInfoRow(label: '아이디', value: username),
-                          const SizedBox(height: 10),
                           _ProfileInfoRow(
-                            label: '휴대전화',
-                            value: phone.isEmpty ? '등록된 번호 없음' : phone,
+                            label: l10n.username,
+                            value: username,
                           ),
                           const SizedBox(height: 10),
                           _ProfileInfoRow(
-                            label: '휠체어 탑승 여부',
-                            value: needsWheelchair ? '예' : '아니오',
+                            label: l10n.phoneNumber,
+                            value: phone.isEmpty
+                                ? l10n.noRegisteredPhone
+                                : phone,
+                          ),
+                          const SizedBox(height: 10),
+                          _ProfileInfoRow(
+                            label: l10n.wheelchairUser,
+                            value: needsWheelchair ? l10n.yes : l10n.no,
                           ),
                         ],
                       ),
@@ -1126,9 +1135,9 @@ class ProfileContentView extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Text(
-                                '시간표',
-                                style: TextStyle(
+                              Text(
+                                l10n.timetable,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF111827),
@@ -1183,9 +1192,9 @@ class ProfileContentView extends StatelessWidget {
                             borderRadius: BorderRadius.circular(13),
                           ),
                         ),
-                        child: const Text(
-                          '로그아웃',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.logout,
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF374151),
@@ -1215,7 +1224,7 @@ class _ProfileInfoRow extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 110,
+          width: 130,
           child: Text(
             label,
             style: const TextStyle(
@@ -1339,6 +1348,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<void> _saveProfile() async {
+    final l10n = AppLocalizations.of(context)!;
+
     final phoneMiddle = _phoneMiddleController.text.trim();
     final phoneLast = _phoneLastController.text.trim();
     final phone = '010-$phoneMiddle-$phoneLast';
@@ -1346,14 +1357,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     if (phoneMiddle.isEmpty || phoneLast.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('휴대전화 번호를 모두 입력해주세요.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.enterFullPhoneNumber)));
       return;
     }
 
     if (phoneMiddle.length != 4 || phoneLast.length != 4) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('휴대전화 번호는 4자리씩 입력해주세요.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.phoneNumberFourDigits)));
       return;
     }
 
@@ -1371,9 +1382,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'] ?? '프로필 수정 결과를 확인할 수 없습니다.')),
+        SnackBar(
+          content: Text(
+            result['success'] == true
+                ? l10n.profileUpdateSuccess
+                : l10n.profileUpdateFailed,
+          ),
+        ),
       );
-
       if (result['success'] == true) {
         final user = Map<String, dynamic>.from(result['user']);
 
@@ -1387,7 +1403,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     } finally {
       if (mounted) {
         setState(() {
@@ -1399,15 +1415,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          '프로필 수정',
-          style: TextStyle(
+        title: Text(
+          l10n.editProfile,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: Color(0xFF111827),
@@ -1420,7 +1438,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLabel('아이디'),
+              _buildLabel(l10n.username),
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
@@ -1445,7 +1463,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
               const SizedBox(height: 18),
 
-              _buildLabel('휴대전화'),
+              _buildLabel(l10n.phoneNumber),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -1512,13 +1530,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
               const SizedBox(height: 20),
 
-              _buildLabel('휠체어 탑승 여부'),
+              _buildLabel(l10n.wheelchairUser),
               const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: _buildToggleButton(
-                      label: '예',
+                      label: l10n.yes,
                       selected: _needsWheelchair,
                       onTap: () {
                         setState(() {
@@ -1530,7 +1548,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _buildToggleButton(
-                      label: '아니오',
+                      label: l10n.no,
                       selected: !_needsWheelchair,
                       onTap: () {
                         setState(() {
@@ -1558,7 +1576,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                   ),
                   child: Text(
-                    _isSaving ? '저장 중...' : '수정 완료',
+                    _isSaving ? l10n.saveInProgress : l10n.saveChanges,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
@@ -1673,6 +1691,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     TextEditingController controller, {
     bool isStartTime = false,
   }) async {
+    final l10n = AppLocalizations.of(context)!;
     final currentMinute = _parseTimeToMinute(controller.text) ?? 9 * 60;
 
     final now = DateTime.now();
@@ -1707,9 +1726,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                       onPressed: () {
                         Navigator.pop(context);
                       },
-                      child: const Text(
-                        '취소',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.cancel,
+                        style: const TextStyle(
                           color: Color(0xFF6B7280),
                           fontWeight: FontWeight.w700,
                         ),
@@ -1757,9 +1776,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
                         Navigator.pop(context);
                       },
-                      child: const Text(
-                        '완료',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.done,
+                        style: const TextStyle(
                           color: Color(0xFF2563EB),
                           fontWeight: FontWeight.w900,
                         ),
@@ -1866,12 +1885,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   }
 
   void _startEditClass(int index) {
+    final l10n = AppLocalizations.of(context)!;
     final entry = _timetable[index];
 
     if (entry.id == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('수정할 시간표 정보를 찾을 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.timetableEditInfoMissing)));
       return;
     }
 
@@ -1890,20 +1910,21 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   }
 
   Future<void> _updateClass() async {
+    final l10n = AppLocalizations.of(context)!;
     final userId = widget.userId;
     final scheduleId = _editingScheduleId;
 
     if (userId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
     if (scheduleId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('수정할 시간표를 선택해주세요.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.selectTimetableToEdit)));
       return;
     }
 
@@ -1915,7 +1936,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     if (_selectedDays.length != 1) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('수정할 요일은 하나만 선택해주세요.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.selectOneDayToEdit)));
       return;
     }
 
@@ -1930,7 +1951,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
     if (hasOverlap) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$selectedDay요일 같은 시간대에 이미 수업이 있습니다.')),
+        SnackBar(
+          content: Text(l10n.classTimeOverlap(_dayDisplayText(selectedDay))),
+        ),
       );
       return;
     }
@@ -1959,18 +1982,18 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('시간표가 수정되었습니다.')));
+        ).showSnackBar(SnackBar(content: Text(l10n.timetableUpdated)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? '시간표 수정에 실패했습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.timetableUpdateFailed)));
       }
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     } finally {
       if (mounted) {
         setState(() {
@@ -1981,12 +2004,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   }
 
   Future<void> _addClass() async {
+    final l10n = AppLocalizations.of(context)!;
     final userId = widget.userId;
 
     if (userId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
@@ -2002,7 +2026,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     if (overlappingDay.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${overlappingDay.first}요일 같은 시간대에 이미 수업이 있습니다.'),
+          content: Text(
+            l10n.classTimeOverlap(_dayDisplayText(overlappingDay.first)),
+          ),
         ),
       );
       return;
@@ -2026,9 +2052,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
         if (result['success'] != true) {
           if (!mounted) return;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message'] ?? '시간표 추가에 실패했습니다.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.timetableAddFailed)));
           return;
         }
       }
@@ -2041,13 +2067,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('시간표가 추가되었습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.timetableAdded)));
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     } finally {
       if (mounted) {
         setState(() {
@@ -2067,13 +2093,33 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     return '$hourText:$minuteText';
   }
 
+  String _dayDisplayText(String day) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (day) {
+      case '월':
+        return l10n.mondayShort;
+      case '화':
+        return l10n.tuesdayShort;
+      case '수':
+        return l10n.wednesdayShort;
+      case '목':
+        return l10n.thursdayShort;
+      case '금':
+        return l10n.fridayShort;
+      default:
+        return day;
+    }
+  }
+
   Future<void> _deleteClass(int index) async {
+    final l10n = AppLocalizations.of(context)!;
     final userId = widget.userId;
 
     if (userId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
@@ -2082,7 +2128,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     if (entry.id == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('삭제할 시간표 정보를 찾을 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.timetableDeleteInfoMissing)));
       return;
     }
 
@@ -2099,24 +2145,28 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('시간표가 삭제되었습니다.')));
+        ).showSnackBar(SnackBar(content: Text(l10n.timetableDeleted)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? '시간표 삭제에 실패했습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.timetableDeleteFailed)));
       }
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     }
   }
 
   void _confirmDeleteClass(int index) {
     final entry = _timetable[index];
 
+    final l10n = AppLocalizations.of(context)!;
+    final dayText = _dayDisplayText(entry.day);
+    final timeText =
+        '${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}';
     showDialog(
       context: context,
       builder: (context) {
@@ -2124,13 +2174,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            '수업 삭제',
-            style: TextStyle(fontWeight: FontWeight.w900),
+          title: Text(
+            l10n.deleteClassTitle,
+            style: const TextStyle(fontWeight: FontWeight.w900),
           ),
           content: Text(
-            '${entry.day}요일 ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}\n'
-            '${entry.room} 수업을 삭제할까요?',
+            l10n.deleteClassMessage(dayText, timeText, entry.room),
             style: const TextStyle(fontSize: 14, height: 1.5),
           ),
           actions: [
@@ -2138,9 +2187,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text(
-                '취소',
-                style: TextStyle(
+              child: Text(
+                l10n.cancel,
+                style: const TextStyle(
                   color: Color(0xFF6B7280),
                   fontWeight: FontWeight.w700,
                 ),
@@ -2151,9 +2200,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                 Navigator.pop(context);
                 await _deleteClass(index);
               },
-              child: const Text(
-                '삭제',
-                style: TextStyle(
+              child: Text(
+                l10n.deleteButton,
+                style: const TextStyle(
                   color: Color(0xFFDC2626),
                   fontWeight: FontWeight.w900,
                 ),
@@ -2167,6 +2216,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
@@ -2197,21 +2247,21 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '시간표 편집',
-                        style: TextStyle(
+                        l10n.editTimetable,
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF111827),
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        '수업 정보를 입력하세요',
-                        style: TextStyle(
+                        l10n.enterClassInfo,
+                        style: const TextStyle(
                           fontSize: 11,
                           color: Color(0xFF9CA3AF),
                         ),
@@ -2230,18 +2280,18 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                 child: Column(
                   children: [
                     _sectionCard(
-                      title: '현재 시간표',
+                      title: l10n.currentTimetable,
                       child: TimetableGrid(timetable: _timetable),
                     ),
 
                     const SizedBox(height: 16),
 
                     _sectionCard(
-                      title: _isEditing ? '수업 수정' : '수업 추가',
+                      title: _isEditing ? l10n.editClass : l10n.addClass,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('요일'),
+                          _buildLabel(l10n.dayLabel),
                           const SizedBox(height: 8),
 
                           Row(
@@ -2281,7 +2331,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                       borderRadius: BorderRadius.circular(9),
                                     ),
                                     child: Text(
-                                      day,
+                                      _dayDisplayText(day),
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 13,
@@ -2305,11 +2355,11 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _buildLabel('시작 시간'),
+                                    _buildLabel(l10n.startTimeLabel),
                                     const SizedBox(height: 8),
                                     _buildTextField(
                                       controller: _startTimeController,
-                                      hintText: '예: 09:15',
+                                      hintText: l10n.exampleTime,
                                       readOnly: true,
                                       onTap: () => _pickTime(
                                         _startTimeController,
@@ -2324,11 +2374,11 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _buildLabel('종료 시간'),
+                                    _buildLabel(l10n.endTimeLabel),
                                     const SizedBox(height: 8),
                                     _buildTextField(
                                       controller: _endTimeController,
-                                      hintText: '예: 10:45',
+                                      hintText: l10n.exampleEndTime,
                                       readOnly: true,
                                       onTap: () =>
                                           _pickTime(_endTimeController),
@@ -2341,7 +2391,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
                           const SizedBox(height: 18),
 
-                          _buildLabel('강의실'),
+                          _buildLabel(l10n.classroomLabel),
                           const SizedBox(height: 8),
 
                           Row(
@@ -2404,7 +2454,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 flex: 2,
                                 child: _buildTextField(
                                   controller: _roomNumberController,
-                                  hintText: '예: 101',
+                                  hintText: l10n.exampleRoom,
                                   keyboardType: TextInputType.text,
                                 ),
                               ),
@@ -2438,13 +2488,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                               ),
                               child: Text(
                                 _isUpdatingClass
-                                    ? '수정 중...'
+                                    ? l10n.updatingClass
                                     : _isAddingClass
-                                    ? '추가 중...'
+                                    ? l10n.addingClass
                                     : _isEditing
-                                    ? '수정 완료'
-                                    : '수업 추가',
-                                style: TextStyle(
+                                    ? l10n.updateClassDone
+                                    : l10n.addClass,
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -2457,9 +2507,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                               width: double.infinity,
                               child: TextButton(
                                 onPressed: _resetClassForm,
-                                child: const Text(
-                                  '수정 취소',
-                                  style: TextStyle(
+                                child: Text(
+                                  l10n.cancelEdit,
+                                  style: const TextStyle(
                                     color: Color(0xFF6B7280),
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -2475,7 +2525,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                       const SizedBox(height: 16),
 
                       _sectionCard(
-                        title: '수업 목록',
+                        title: l10n.classList,
                         child: Column(
                           children: List.generate(_timetable.length, (index) {
                             final entry = _timetable[index];
@@ -2514,7 +2564,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          '${entry.day}요일 ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}',
+                                          '${_dayDisplayText(entry.day)} ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}',
                                           style: const TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w900,
@@ -2598,9 +2648,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                             borderRadius: BorderRadius.circular(13),
                           ),
                         ),
-                        child: const Text(
-                          '완료',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.done,
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w900,
                           ),
@@ -2735,6 +2785,25 @@ class TimetableGrid extends StatelessWidget {
     return hour.toString().padLeft(2, '0');
   }
 
+  String _dayDisplayText(BuildContext context, String day) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (day) {
+      case '월':
+        return l10n.mondayShort;
+      case '화':
+        return l10n.tuesdayShort;
+      case '수':
+        return l10n.wednesdayShort;
+      case '목':
+        return l10n.thursdayShort;
+      case '금':
+        return l10n.fridayShort;
+      default:
+        return day;
+    }
+  }
+
   String _shortRoomName(String room) {
     // 시간표 칸이 좁으므로 긴 건물명은 약칭으로 줄여 표시
     return room
@@ -2786,7 +2855,7 @@ class TimetableGrid extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(7),
                               ),
                               child: Text(
-                                day,
+                                _dayDisplayText(context, day),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 12,
