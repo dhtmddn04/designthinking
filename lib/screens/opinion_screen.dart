@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 
 // ──────────────────────────────────────────────
 //  상수 데이터
@@ -19,6 +20,7 @@ const Map<String, Map<String, double>> _stationCoordinates = {
 };
 
 const double _nearStationThresholdMeters = 50.0;
+
 // ──────────────────────────────────────────────
 //  StatefulWidget
 // ──────────────────────────────────────────────
@@ -50,6 +52,21 @@ class _OpinionScreenState extends State<OpinionScreen>
     final now = DateTime.now();
     return now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
     //return false;
+  }
+
+  String _stationDisplayName(String station) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (station) {
+      case '정문':
+        return l10n.mainGateStation;
+      case '외대':
+        return l10n.oedaeStation;
+      case '전정대':
+        return l10n.jeonjeongdaeStation;
+      default:
+        return station;
+    }
   }
 
   // ── 탭 선택 상태 ─────────────────────────────
@@ -122,26 +139,49 @@ class _OpinionScreenState extends State<OpinionScreen>
   bool get _canReport => _remainingCooldown == Duration.zero;
 
   String get _cooldownText {
+    final l10n = AppLocalizations.of(context)!;
+
     final r = _remainingCooldown;
     final m = r.inMinutes;
     final s = r.inSeconds % 60;
-    if (m > 0) return '$m분 $s초';
-    return '$s초';
+
+    if (m > 0) return l10n.cooldownMinutesSeconds(m, s);
+    return l10n.cooldownSeconds(s);
+  }
+
+  String _congestionDisplayText(String level) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (level) {
+      case '여유':
+        return l10n.congestionLight;
+      case '보통':
+        return l10n.congestionNormal;
+      case '약간 혼잡':
+        return l10n.congestionBusy;
+      case '혼잡':
+        return l10n.congestionCrowded;
+      default:
+        return level;
+    }
   }
 
   double _toRad(double deg) => deg * pi / 180;
 
-  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+  double _calculateDistance(
+    double lat1,
+    double lng1,
+    double lat2,
+    double lng2,
+  ) {
     const earthRadius = 6371000.0;
 
     final dLat = _toRad(lat2 - lat1);
     final dLng = _toRad(lng2 - lng1);
 
-    final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRad(lat1)) *
-            cos(_toRad(lat2)) *
-            sin(dLng / 2) *
-            sin(dLng / 2);
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRad(lat1)) * cos(_toRad(lat2)) * sin(dLng / 2) * sin(dLng / 2);
 
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
 
@@ -172,26 +212,27 @@ class _OpinionScreenState extends State<OpinionScreen>
   }
 
   String get _locationStatusText {
+    final l10n = AppLocalizations.of(context)!;
+
     if (_selectedLocation == null) {
-      return '제보할 정류장을 선택하면 현재 위치와의 거리를 확인할 수 있어요.';
+      return l10n.selectStopToCheckDistance;
     }
 
-    // 테스트용: 선택한 정류장 근처로 처리
     if (_useTestNearStation) {
-      return '테스트 모드: 현재 $_selectedLocation 정류장 근처로 처리 중입니다.\n제보할 수 있어요. (0m)';
+      return l10n.testModeNearStop(_stationDisplayName(_selectedLocation!));
     }
 
     if (!_locationPermissionGranted) {
-      return '현재 위치를 확인할 수 없어요. 위치 권한과 GPS 설정을 확인해 주세요.';
+      return l10n.cannotCheckLocation;
     }
 
     if (_currentPosition == null) {
-      return '현재 위치를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.';
+      return l10n.checkingLocation;
     }
 
     final coords = _stationCoordinates[_selectedLocation];
     if (coords == null) {
-      return '정류장 위치 정보를 확인할 수 없어요.';
+      return l10n.cannotCheckStopLocation;
     }
 
     final distance = _calculateDistance(
@@ -206,10 +247,13 @@ class _OpinionScreenState extends State<OpinionScreen>
         : '${(distance / 1000).toStringAsFixed(1)}km';
 
     if (distance <= _nearStationThresholdMeters) {
-      return '현재 $_selectedLocation 정류장 근처입니다. 제보할 수 있어요. ($distanceText)';
+      return l10n.nearSelectedStop(
+        _stationDisplayName(_selectedLocation!),
+        distanceText,
+      );
     }
 
-    return '정류장 50m 이내에서만 제보할 수 있어요.\n현재 거리: $distanceText';
+    return l10n.reportOnlyWithin50m(distanceText);
   }
 
   bool get _canReportByLocation {
@@ -265,21 +309,24 @@ class _OpinionScreenState extends State<OpinionScreen>
       });
     } catch (_) {}
 
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 0,
-      ),
-    ).listen((position) {
-      if (!mounted) return;
+    _positionSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 0,
+          ),
+        ).listen((position) {
+          if (!mounted) return;
 
-      setState(() {
-        _currentPosition = position;
-      });
-    });
+          setState(() {
+            _currentPosition = position;
+          });
+        });
   }
 
   void _showWeekendReportDialog() {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (context) {
@@ -287,15 +334,15 @@ class _OpinionScreenState extends State<OpinionScreen>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            '제보 불가',
-            style: TextStyle(fontWeight: FontWeight.w800),
+          title: Text(
+            l10n.reportUnavailable,
+            style: const TextStyle(fontWeight: FontWeight.w800),
           ),
-          content: const Text('주말에는 혼잡도 제보를 이용할 수 없습니다.'),
+          content: Text(l10n.weekendReportUnavailable),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('확인'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -305,10 +352,11 @@ class _OpinionScreenState extends State<OpinionScreen>
 
   // ── 제보 처리 ────────────────────────────────
   Future<void> _submitReport() async {
+    final l10n = AppLocalizations.of(context)!;
     if (widget.userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('로그인이 필요합니다.'),
+          content: Text(l10n.loginRequired),
           backgroundColor: const Color(0xFFF59E0B),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -326,7 +374,9 @@ class _OpinionScreenState extends State<OpinionScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _selectedLocation == null ? '제보 위치를 선택해 주세요.' : '체감 혼잡도를 선택해 주세요.',
+            _selectedLocation == null
+                ? l10n.selectReportLocationMessage
+                : l10n.selectCongestionMessage,
           ),
           backgroundColor: const Color(0xFFF59E0B),
           behavior: SnackBarBehavior.floating,
@@ -399,8 +449,10 @@ class _OpinionScreenState extends State<OpinionScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '[$_selectedLocation] $_selectedCongestion 제보 완료!\n'
-              '5분 후 다시 제보할 수 있어요.',
+              l10n.reportSubmitSuccess(
+                _stationDisplayName(_selectedLocation!),
+                _congestionDisplayText(_selectedCongestion!),
+              ),
             ),
             backgroundColor: _primary,
             behavior: SnackBarBehavior.floating,
@@ -412,7 +464,7 @@ class _OpinionScreenState extends State<OpinionScreen>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? '제보 저장에 실패했습니다.'),
+            content: Text(l10n.reportSubmitFailed),
             backgroundColor: const Color(0xFFEF4444),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -426,7 +478,7 @@ class _OpinionScreenState extends State<OpinionScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('서버에 연결할 수 없습니다.'),
+          content: Text(l10n.serverConnectionFailed),
           backgroundColor: const Color(0xFFEF4444),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -466,27 +518,32 @@ class _OpinionScreenState extends State<OpinionScreen>
 
   // ── 쿨다운 다이얼로그 ────────────────────────
   void _showCooldownDialog() {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.timer_outlined, color: Color(0xFFF59E0B)),
-            SizedBox(width: 8),
-            Text('잠깐!', style: TextStyle(fontWeight: FontWeight.w800)),
+            const Icon(Icons.timer_outlined, color: Color(0xFFF59E0B)),
+            const SizedBox(width: 8),
+            Text(
+              l10n.cooldownTitle,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ],
         ),
         content: Text(
-          '제보는 정류장 근처에서 5분에 한 번만 가능해요.\n\n⏱ $_cooldownText 후 제보 가능합니다',
+          l10n.cooldownMessage(_cooldownText),
           style: const TextStyle(fontSize: 14, height: 1.6),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              '확인',
-              style: TextStyle(
+            child: Text(
+              l10n.ok,
+              style: const TextStyle(
                 color: Color(0xFF2563EB),
                 fontWeight: FontWeight.w700,
               ),
@@ -517,7 +574,9 @@ class _OpinionScreenState extends State<OpinionScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
-    final bool canSubmitNow = !_isWeekend && _canReport && _isNearSelectedLocation;
+    final l10n = AppLocalizations.of(context)!;
+    final bool canSubmitNow =
+        !_isWeekend && _canReport && _isNearSelectedLocation;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -527,11 +586,11 @@ class _OpinionScreenState extends State<OpinionScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── 제목 ──────────────────────
-              const Padding(
+              Padding(
                 padding: const EdgeInsets.fromLTRB(20, 44, 20, 0),
                 child: Text(
-                  '실시간 체감 혼잡도 제보',
-                  style: TextStyle(
+                  l10n.reportTitle,
+                  style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w700,
                     color: _textDark,
@@ -540,11 +599,11 @@ class _OpinionScreenState extends State<OpinionScreen>
                 ),
               ),
               const SizedBox(height: 4),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  '실제 정류장에서 느낀 혼잡도를 제보해 주세요.',
-                  style: TextStyle(fontSize: 14, color: _textGray),
+                  l10n.reportSubtitle,
+                  style: const TextStyle(fontSize: 14, color: _textGray),
                 ),
               ),
               const SizedBox(height: 24),
@@ -558,9 +617,9 @@ class _OpinionScreenState extends State<OpinionScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '제보 위치',
-                            style: TextStyle(
+                          Text(
+                            l10n.reportLocation,
+                            style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: _textDark,
@@ -569,7 +628,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                           const SizedBox(height: 8),
                           _buildDropdown(
                             value: _selectedLocation,
-                            hint: '위치 선택',
+                            hint: l10n.selectLocation,
                             items: _locations,
                             onChanged: (v) =>
                                 setState(() => _selectedLocation = v),
@@ -582,9 +641,9 @@ class _OpinionScreenState extends State<OpinionScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '체감 혼잡도',
-                            style: TextStyle(
+                          Text(
+                            l10n.feltCongestion,
+                            style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: _textDark,
@@ -593,7 +652,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                           const SizedBox(height: 8),
                           _buildDropdown(
                             value: _selectedCongestion,
-                            hint: '혼잡도 선택',
+                            hint: l10n.selectCongestion,
                             items: _congestionLevels,
                             onChanged: (v) =>
                                 setState(() => _selectedCongestion = v),
@@ -623,20 +682,20 @@ class _OpinionScreenState extends State<OpinionScreen>
                       _isWeekend
                           ? Icons.block
                           : !_canReport
-                            ? Icons.lock_clock
-                            : !_isNearSelectedLocation
-                              ? Icons.location_on_outlined
-                              : Icons.play_arrow,
+                          ? Icons.lock_clock
+                          : !_isNearSelectedLocation
+                          ? Icons.location_on_outlined
+                          : Icons.play_arrow,
                       size: 20,
                     ),
                     label: Text(
                       _isWeekend
-                          ? '제보 불가'
+                          ? l10n.reportUnavailable
                           : !_canReport
-                            ? '$_cooldownText 후 제보 가능합니다'
-                            : !_isNearSelectedLocation
-                              ? '정류장 근처에서 제보 가능'
-                              : '제보하기',
+                          ? l10n.canReportAfter(_cooldownText)
+                          : !_isNearSelectedLocation
+                          ? l10n.reportNearStopOnly
+                          : l10n.submitReport,
                       style: TextStyle(
                         fontSize: canSubmitNow ? 16 : 13,
                         fontWeight: FontWeight.w700,
@@ -661,9 +720,9 @@ class _OpinionScreenState extends State<OpinionScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    const Text(
-                      '실시간 제보 현황',
-                      style: TextStyle(
+                    Text(
+                      l10n.realtimeReportStatus,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: _textDark,
@@ -693,11 +752,11 @@ class _OpinionScreenState extends State<OpinionScreen>
                 ),
               ),
               const SizedBox(height: 4),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  '학생들이 제보한 실시간 혼잡 데이터를 확인하세요.',
-                  style: TextStyle(fontSize: 13, color: _textGray),
+                  l10n.reportStatusSubtitle,
+                  style: const TextStyle(fontSize: 13, color: _textGray),
                 ),
               ),
               const SizedBox(height: 16),
@@ -726,7 +785,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                             ),
                             alignment: Alignment.center,
                             child: Text(
-                              _tabLabels[i],
+                              _stationDisplayName(_tabLabels[i]),
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -767,7 +826,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _tabLabels[_selectedTab],
+                            _stationDisplayName(_tabLabels[_selectedTab]),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -775,7 +834,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                             ),
                           ),
                           Text(
-                            '전체 $_currentTotal건',
+                            l10n.totalReports(_currentTotal),
                             style: const TextStyle(
                               fontSize: 13,
                               color: _textGray,
@@ -791,7 +850,7 @@ class _OpinionScreenState extends State<OpinionScreen>
                         return _congestionLevels.map((level) {
                           final count = _counts[loc]![level] ?? 0;
                           return _CongestionBar(
-                            label: level,
+                            label: _congestionDisplayText(level),
                             count: count,
                             total: total,
                             highlight: highlight != null && level == highlight,
@@ -807,18 +866,21 @@ class _OpinionScreenState extends State<OpinionScreen>
               const SizedBox(height: 12),
 
               // ── 하단 안내 문구 (가운데 정렬) ─
-              const SizedBox(
+              SizedBox(
                 width: double.infinity,
                 child: Text(
-                  '* 데이터는 최근 5분 이내 학생들의 체감 혼잡도 제보를 기반으로 합니다.',
+                  l10n.recentReportNotice,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF9CA3AF),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 12),
 
-// ── CCTV 보완 안내 박스 ─
+              // ── CCTV 보완 안내 박스 ─
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
@@ -829,19 +891,19 @@ class _OpinionScreenState extends State<OpinionScreen>
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.info_outline_rounded,
                         size: 18,
                         color: Color(0xFF6B7280),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '체감 혼잡도 제보는 CCTV 대기 인원을 보완해 탑승 예상 계산에 사용됩니다.',
-                          style: TextStyle(
+                          l10n.cctvSupplementNotice,
+                          style: const TextStyle(
                             fontSize: 12,
                             height: 1.5,
                             color: Color(0xFF6B7280),
@@ -948,7 +1010,18 @@ class _OpinionScreenState extends State<OpinionScreen>
             color: Color(0xFF111827),
           ),
           items: items
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+              .map(
+                (e) => DropdownMenuItem(
+                  value: e,
+                  child: Text(
+                    items == _congestionLevels
+                        ? _congestionDisplayText(e)
+                        : items == _locations
+                        ? _stationDisplayName(e)
+                        : e,
+                  ),
+                ),
+              )
               .toList(),
           onChanged: onChanged,
         ),
@@ -979,6 +1052,7 @@ class _CongestionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final ratio = total > 0 ? count / total : 0.0;
 
     return Padding(
@@ -1023,7 +1097,7 @@ class _CongestionBar extends StatelessWidget {
           SizedBox(
             width: 36,
             child: Text(
-              '$count건',
+              l10n.reportCount(count),
               textAlign: TextAlign.right,
               style: TextStyle(
                 fontSize: 13,

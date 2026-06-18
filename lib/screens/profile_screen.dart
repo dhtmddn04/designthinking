@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../widgets/language_icon_button.dart';
+import '../l10n/app_localizations.dart';
 // ─────────────────────────────────────────────
 // 데이터 모델
 // ─────────────────────────────────────────────
@@ -96,6 +98,8 @@ class ProfileScreen extends StatefulWidget {
   final String? username;
   final String? phone;
   final bool needsWheelchair;
+  final String languageCode;
+  final Future<void> Function(String code) onLanguageChanged;
   final Future<void> Function(Map<String, dynamic> user, bool autoLogin)
   onLoginSuccess;
   final Future<void> Function() onLogoutSuccess;
@@ -107,6 +111,8 @@ class ProfileScreen extends StatefulWidget {
     required this.username,
     required this.phone,
     required this.needsWheelchair,
+    required this.languageCode,
+    required this.onLanguageChanged,
     required this.onLoginSuccess,
     required this.onLogoutSuccess,
     required this.onProfileUpdated,
@@ -234,9 +240,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      final l10n = AppLocalizations.of(context)!;
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('시간표를 불러올 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.timetableLoadFailed)));
     }
   }
 
@@ -276,6 +284,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     if (!_isLoggedIn && _showSignup) {
       return SignupView(
+        languageCode: widget.languageCode,
+        onLanguageChanged: widget.onLanguageChanged,
         onBackToLogin: () {
           setState(() {
             _showSignup = false;
@@ -286,6 +296,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (!_isLoggedIn) {
       return LoginView(
+        languageCode: widget.languageCode,
+        onLanguageChanged: widget.onLanguageChanged,
         onLogin: _login,
         onLoginSuccess: widget.onLoginSuccess,
         onSignup: () {
@@ -301,6 +313,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       username: _loggedInUser,
       phone: _phone,
       needsWheelchair: _needsWheelchair,
+      languageCode: widget.languageCode,
+      onLanguageChanged: widget.onLanguageChanged,
       timetable: _timetable,
       onLogout: _logout,
       onTimetableUpdated: _updateTimetable,
@@ -314,6 +328,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // ─────────────────────────────────────────────
 
 class LoginView extends StatefulWidget {
+  final String languageCode;
+  final Future<void> Function(String code) onLanguageChanged;
   final void Function(String username) onLogin;
   final Future<void> Function(Map<String, dynamic> user, bool autoLogin)
   onLoginSuccess;
@@ -321,6 +337,8 @@ class LoginView extends StatefulWidget {
 
   const LoginView({
     super.key,
+    required this.languageCode,
+    required this.onLanguageChanged,
     required this.onLogin,
     required this.onLoginSuccess,
     required this.onSignup,
@@ -344,184 +362,212 @@ class _LoginViewState extends State<LoginView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: Colors.white,
       child: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 24, 22, 90),
-            child: Column(
-              children: [
-                const SizedBox(height: 36),
-                Container(
-                  width: 74,
-                  height: 74,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x332563EB),
-                        blurRadius: 12,
-                        offset: Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.person_outline_rounded,
-                    color: Colors.white,
-                    size: 38,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  '로그인',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF111827),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                const Text(
-                  '계정에 로그인하세요',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-                ),
-                const SizedBox(height: 34),
-
-                _buildLabel('아이디'),
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _usernameController,
-                  hintText: '아이디를 입력하세요',
-                ),
-
-                const SizedBox(height: 16),
-
-                _buildLabel('비밀번호'),
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _passwordController,
-                  hintText: '비밀번호를 입력하세요',
-                  obscureText: true,
-                ),
-
-                const SizedBox(height: 12),
-
-                Row(
+        child: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 24, 22, 90),
+                child: Column(
                   children: [
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _autoLogin = !_autoLogin;
-                        });
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: 18,
-                        height: 18,
-                        decoration: BoxDecoration(
-                          color: _autoLogin
-                              ? const Color(0xFF2563EB)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: _autoLogin
-                                ? const Color(0xFF2563EB)
-                                : const Color(0xFFD1D5DB),
-                            width: 1.5,
+                    const SizedBox(height: 36),
+                    Container(
+                      width: 74,
+                      height: 74,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color(0x332563EB),
+                            blurRadius: 12,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.person_outline_rounded,
+                        color: Colors.white,
+                        size: 38,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      l10n.login,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      l10n.loginSubtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                    const SizedBox(height: 34),
+
+                    _buildLabel(l10n.username),
+                    const SizedBox(height: 8),
+                    _buildTextField(
+                      controller: _usernameController,
+                      hintText: l10n.enterUsername,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    _buildLabel(l10n.password),
+                    const SizedBox(height: 8),
+                    _buildTextField(
+                      controller: _passwordController,
+                      hintText: l10n.enterPassword,
+                      obscureText: true,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _autoLogin = !_autoLogin;
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: _autoLogin
+                                  ? const Color(0xFF2563EB)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: _autoLogin
+                                    ? const Color(0xFF2563EB)
+                                    : const Color(0xFFD1D5DB),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: _autoLogin
+                                ? const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 13,
+                                  )
+                                : null,
                           ),
                         ),
-                        child: _autoLogin
-                            ? const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 13,
-                              )
-                            : null,
-                      ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _autoLogin = !_autoLogin;
+                            });
+                          },
+                          child: Text(
+                            l10n.autoLogin,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _autoLogin = !_autoLogin;
-                        });
+
+                    const SizedBox(height: 22),
+
+                    _buildPrimaryButton(
+                      label: l10n.login,
+                      onTap: () async {
+                        final username = _usernameController.text.trim();
+                        final password = _passwordController.text.trim();
+
+                        if (username.isEmpty || password.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.enterUsernameAndPassword),
+                            ),
+                          );
+                          return;
+                        }
+
+                        try {
+                          final result = await ApiService.login(
+                            username: username,
+                            password: password,
+                          );
+
+                          if (!context.mounted) return;
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                result['success'] == true
+                                    ? l10n.loginSuccess
+                                    : l10n.loginFailed,
+                              ),
+                            ),
+                          );
+
+                          if (result['success'] == true) {
+                            final user = Map<String, dynamic>.from(
+                              result['user'],
+                            );
+
+                            widget.onLogin(user['username']?.toString() ?? '');
+                            await widget.onLoginSuccess(user, _autoLogin);
+                          }
+                        } catch (e) {
+                          if (!context.mounted) return;
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.serverConnectionFailed),
+                            ),
+                          );
+                        }
                       },
-                      child: const Text(
-                        '자동 로그인',
-                        style: TextStyle(
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    TextButton(
+                      onPressed: widget.onSignup,
+                      child: Text(
+                        l10n.signup,
+                        style: const TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF374151),
+                          color: Color(0xFF4B5563),
                         ),
                       ),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 22),
-
-                _buildPrimaryButton(
-                  label: '로그인',
-                  onTap: () async {
-                    final username = _usernameController.text.trim();
-                    final password = _passwordController.text.trim();
-
-                    if (username.isEmpty || password.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('아이디와 비밀번호를 입력해주세요.')),
-                      );
-                      return;
-                    }
-
-                    try {
-                      final result = await ApiService.login(
-                        username: username,
-                        password: password,
-                      );
-
-                      if (!context.mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            result['message'] ?? '로그인 결과를 확인할 수 없습니다.',
-                          ),
-                        ),
-                      );
-
-                      if (result['success'] == true) {
-                        final user = Map<String, dynamic>.from(result['user']);
-
-                        widget.onLogin(user['username']?.toString() ?? '');
-                        await widget.onLoginSuccess(user, _autoLogin);
-                      }
-                    } catch (e) {
-                      if (!context.mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
-                      );
-                    }
-                  },
-                ),
-
-                const SizedBox(height: 18),
-
-                TextButton(
-                  onPressed: widget.onSignup,
-                  child: const Text(
-                    '회원가입',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            Positioned(
+              top: 8,
+              right: 16,
+              child: LanguageIconButton(
+                languageCode: widget.languageCode,
+                onSelected: widget.onLanguageChanged,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -532,9 +578,16 @@ class _LoginViewState extends State<LoginView> {
 // 회원가입 화면
 // ─────────────────────────────────────────────
 class SignupView extends StatefulWidget {
+  final String languageCode;
+  final Future<void> Function(String code) onLanguageChanged;
   final VoidCallback onBackToLogin;
 
-  const SignupView({super.key, required this.onBackToLogin});
+  const SignupView({
+    super.key,
+    required this.languageCode,
+    required this.onLanguageChanged,
+    required this.onBackToLogin,
+  });
 
   @override
   State<SignupView> createState() => _SignupViewState();
@@ -587,7 +640,10 @@ class _SignupViewState extends State<SignupView> {
         hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
@@ -606,238 +662,260 @@ class _SignupViewState extends State<SignupView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: Colors.white,
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(22, 32, 22, 90),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '회원가입',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF111827),
-                ),
-              ),
-              const SizedBox(height: 5),
-              const Text(
-                '새 계정을 만들어보세요',
-                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-              ),
-              const SizedBox(height: 30),
-
-              _buildLabel('아이디'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _usernameController,
-                hintText: '아이디를 입력하세요',
-              ),
-
-              const SizedBox(height: 16),
-
-              _buildLabel('비밀번호'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _passwordController,
-                hintText: '비밀번호를 입력하세요',
-                obscureText: true,
-              ),
-
-              const SizedBox(height: 16),
-
-              _buildLabel('비밀번호 재확인'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _passwordConfirmController,
-                hintText: '비밀번호를 다시 입력하세요',
-                obscureText: true,
-              ),
-
-              const SizedBox(height: 16),
-
-              _buildLabel('휴대전화'),
-              const SizedBox(height: 8),
-              Row(
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(22, 64, 22, 90),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 70,
-                    height: 49,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFD1D5DB)),
-                    ),
-                    child: const Text(
-                      '010',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827),
-                      ),
+                  Text(
+                    l10n.signup,
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      '-',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF6B7280),
-                      ),
+                  const SizedBox(height: 5),
+                  Text(
+                    l10n.signupSubtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
                     ),
                   ),
-                  Expanded(
-                    child: _buildPhonePartField(
-                      controller: _phoneMiddleController,
-                      hintText: '1234',
-                      onChanged: (value) {
-                        if (value.length == 4) {
-                          _phoneLastFocusNode.requestFocus();
-                        }
-                      },
-                    ),
+                  const SizedBox(height: 30),
+
+                  _buildLabel(l10n.username),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _usernameController,
+                    hintText: l10n.enterUsername,
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      '-',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
+
+                  const SizedBox(height: 16),
+
+                  _buildLabel(l10n.password),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _passwordController,
+                    hintText: l10n.enterPassword,
+                    obscureText: true,
                   ),
-                  Expanded(
-                    child: _buildPhonePartField(
-                      controller: _phoneLastController,
-                      hintText: '5678',
-                      focusNode: _phoneLastFocusNode,
-                    ),
+
+                  const SizedBox(height: 16),
+
+                  _buildLabel(l10n.confirmPassword),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _passwordConfirmController,
+                    hintText: l10n.reenterPassword,
+                    obscureText: true,
                   ),
-                ],
-              ),
 
-              const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-              _buildLabel('휠체어 탑승 여부'),
-              const SizedBox(height: 10),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildToggleButton(
-                      label: '예',
-                      selected: _needsWheelchair,
-                      onTap: () {
-                        setState(() {
-                          _needsWheelchair = true;
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildToggleButton(
-                      label: '아니오',
-                      selected: !_needsWheelchair,
-                      onTap: () {
-                        setState(() {
-                          _needsWheelchair = false;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 26),
-
-              _buildPrimaryButton(
-                label: '가입하기',
-                onTap: () async {
-                  final username = _usernameController.text.trim();
-                  final password = _passwordController.text.trim();
-                  final passwordConfirm = _passwordConfirmController.text
-                      .trim();
-                  final phoneMiddle = _phoneMiddleController.text.trim();
-                  final phoneLast = _phoneLastController.text.trim();
-                  final phone = '010-$phoneMiddle-$phoneLast';
-
-                  if (username.isEmpty ||
-                      password.isEmpty ||
-                      passwordConfirm.isEmpty ||
-                      phoneMiddle.isEmpty ||
-                      phoneLast.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('모든 정보를 입력해주세요.')),
-                    );
-                    return;
-                  }
-
-                  if (phoneMiddle.length != 4 || phoneLast.length != 4) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('휴대전화 번호는 4자리씩 입력해주세요.')),
-                    );
-                    return;
-                  }
-
-                  if (password != passwordConfirm) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('비밀번호가 일치하지 않습니다.')),
-                    );
-                    return;
-                  }
-
-                  try {
-                    final result = await ApiService.signup(
-                      username: username,
-                      password: password,
-                      phone: phone,
-                      needsWheelchair: _needsWheelchair,
-                    );
-
-                    if (!context.mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          result['message'] ?? '회원가입 결과를 확인할 수 없습니다.',
+                  _buildLabel(l10n.phoneNumber),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        width: 70,
+                        height: 49,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFD1D5DB)),
+                        ),
+                        child: const Text(
+                          '010',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
                         ),
                       ),
-                    );
-
-                    if (result['success'] == true) {
-                      widget.onBackToLogin();
-                    }
-                  } catch (e) {
-                    if (!context.mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
-                    );
-                  }
-                },
-              ),
-
-              const SizedBox(height: 18),
-
-              Center(
-                child: TextButton(
-                  onPressed: widget.onBackToLogin,
-                  child: const Text(
-                    '이미 계정이 있으신가요? 로그인',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '-',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildPhonePartField(
+                          controller: _phoneMiddleController,
+                          hintText: '1234',
+                          onChanged: (value) {
+                            if (value.length == 4) {
+                              _phoneLastFocusNode.requestFocus();
+                            }
+                          },
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '-',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildPhonePartField(
+                          controller: _phoneLastController,
+                          hintText: '5678',
+                          focusNode: _phoneLastFocusNode,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+
+                  const SizedBox(height: 18),
+
+                  _buildLabel(l10n.wheelchairUser),
+                  const SizedBox(height: 10),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildToggleButton(
+                          label: l10n.yes,
+                          selected: _needsWheelchair,
+                          onTap: () {
+                            setState(() {
+                              _needsWheelchair = true;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildToggleButton(
+                          label: l10n.no,
+                          selected: !_needsWheelchair,
+                          onTap: () {
+                            setState(() {
+                              _needsWheelchair = false;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 26),
+
+                  _buildPrimaryButton(
+                    label: l10n.createAccount,
+                    onTap: () async {
+                      final username = _usernameController.text.trim();
+                      final password = _passwordController.text.trim();
+                      final passwordConfirm = _passwordConfirmController.text
+                          .trim();
+                      final phoneMiddle = _phoneMiddleController.text.trim();
+                      final phoneLast = _phoneLastController.text.trim();
+                      final phone = '010-$phoneMiddle-$phoneLast';
+
+                      if (username.isEmpty ||
+                          password.isEmpty ||
+                          passwordConfirm.isEmpty ||
+                          phoneMiddle.isEmpty ||
+                          phoneLast.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.fillAllFields)),
+                        );
+                        return;
+                      }
+
+                      if (phoneMiddle.length != 4 || phoneLast.length != 4) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.phoneNumberFourDigits)),
+                        );
+                        return;
+                      }
+
+                      if (password != passwordConfirm) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.passwordsDoNotMatch)),
+                        );
+                        return;
+                      }
+
+                      try {
+                        final result = await ApiService.signup(
+                          username: username,
+                          password: password,
+                          phone: phone,
+                          needsWheelchair: _needsWheelchair,
+                        );
+
+                        if (!context.mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              result['success'] == true
+                                  ? l10n.signupSuccess
+                                  : l10n.signupFailed,
+                            ),
+                          ),
+                        );
+
+                        if (result['success'] == true) {
+                          widget.onBackToLogin();
+                        }
+                      } catch (e) {
+                        if (!context.mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.serverConnectionFailed)),
+                        );
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Center(
+                    child: TextButton(
+                      onPressed: widget.onBackToLogin,
+                      child: Text(
+                        l10n.backToLogin,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF4B5563),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            Positioned(
+              top: 8,
+              right: 16,
+              child: LanguageIconButton(
+                languageCode: widget.languageCode,
+                onSelected: widget.onLanguageChanged,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -853,6 +931,8 @@ class ProfileContentView extends StatelessWidget {
   final String username;
   final String phone;
   final bool needsWheelchair;
+  final String languageCode;
+  final Future<void> Function(String code) onLanguageChanged;
   final List<TimetableEntry> timetable;
   final VoidCallback onLogout;
   final void Function(List<TimetableEntry>) onTimetableUpdated;
@@ -864,6 +944,8 @@ class ProfileContentView extends StatelessWidget {
     required this.username,
     required this.phone,
     required this.needsWheelchair,
+    required this.languageCode,
+    required this.onLanguageChanged,
     required this.timetable,
     required this.onLogout,
     required this.onTimetableUpdated,
@@ -872,6 +954,8 @@ class ProfileContentView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: const Color(0xFFF9FAFB),
       child: SafeArea(
@@ -907,26 +991,37 @@ class ProfileContentView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '아이디',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6B7280),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.username,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        username,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF111827),
+                        const SizedBox(height: 2),
+                        Text(
+                          username,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF111827),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  LanguageIconButton(
+                    languageCode: languageCode,
+                    onSelected: onLanguageChanged,
                   ),
                 ],
               ),
@@ -957,9 +1052,9 @@ class ProfileContentView extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Text(
-                                '프로필 정보',
-                                style: TextStyle(
+                              Text(
+                                l10n.profileInfo,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF111827),
@@ -1000,16 +1095,21 @@ class ProfileContentView extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 14),
-                          _ProfileInfoRow(label: '아이디', value: username),
-                          const SizedBox(height: 10),
                           _ProfileInfoRow(
-                            label: '휴대전화',
-                            value: phone.isEmpty ? '등록된 번호 없음' : phone,
+                            label: l10n.username,
+                            value: username,
                           ),
                           const SizedBox(height: 10),
                           _ProfileInfoRow(
-                            label: '휠체어 탑승 여부',
-                            value: needsWheelchair ? '예' : '아니오',
+                            label: l10n.phoneNumber,
+                            value: phone.isEmpty
+                                ? l10n.noRegisteredPhone
+                                : phone,
+                          ),
+                          const SizedBox(height: 10),
+                          _ProfileInfoRow(
+                            label: l10n.wheelchairUser,
+                            value: needsWheelchair ? l10n.yes : l10n.no,
                           ),
                         ],
                       ),
@@ -1035,9 +1135,9 @@ class ProfileContentView extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Text(
-                                '시간표',
-                                style: TextStyle(
+                              Text(
+                                l10n.timetable,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF111827),
@@ -1092,9 +1192,9 @@ class ProfileContentView extends StatelessWidget {
                             borderRadius: BorderRadius.circular(13),
                           ),
                         ),
-                        child: const Text(
-                          '로그아웃',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.logout,
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF374151),
@@ -1117,17 +1217,14 @@ class _ProfileInfoRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _ProfileInfoRow({
-    required this.label,
-    required this.value,
-  });
+  const _ProfileInfoRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         SizedBox(
-          width: 110,
+          width: 130,
           child: Text(
             label,
             style: const TextStyle(
@@ -1230,7 +1327,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
@@ -1248,21 +1348,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<void> _saveProfile() async {
+    final l10n = AppLocalizations.of(context)!;
+
     final phoneMiddle = _phoneMiddleController.text.trim();
     final phoneLast = _phoneLastController.text.trim();
     final phone = '010-$phoneMiddle-$phoneLast';
 
     if (phoneMiddle.isEmpty || phoneLast.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('휴대전화 번호를 모두 입력해주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.enterFullPhoneNumber)));
       return;
     }
 
     if (phoneMiddle.length != 4 || phoneLast.length != 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('휴대전화 번호는 4자리씩 입력해주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.phoneNumberFourDigits)));
       return;
     }
 
@@ -1281,10 +1383,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? '프로필 수정 결과를 확인할 수 없습니다.'),
+          content: Text(
+            result['success'] == true
+                ? l10n.profileUpdateSuccess
+                : l10n.profileUpdateFailed,
+          ),
         ),
       );
-
       if (result['success'] == true) {
         final user = Map<String, dynamic>.from(result['user']);
 
@@ -1296,9 +1401,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('서버에 연결할 수 없습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     } finally {
       if (mounted) {
         setState(() {
@@ -1310,15 +1415,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          '프로필 수정',
-          style: TextStyle(
+        title: Text(
+          l10n.editProfile,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: Color(0xFF111827),
@@ -1331,7 +1438,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLabel('아이디'),
+              _buildLabel(l10n.username),
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
@@ -1356,7 +1463,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
               const SizedBox(height: 18),
 
-              _buildLabel('휴대전화'),
+              _buildLabel(l10n.phoneNumber),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -1423,13 +1530,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
               const SizedBox(height: 20),
 
-              _buildLabel('휠체어 탑승 여부'),
+              _buildLabel(l10n.wheelchairUser),
               const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: _buildToggleButton(
-                      label: '예',
+                      label: l10n.yes,
                       selected: _needsWheelchair,
                       onTap: () {
                         setState(() {
@@ -1441,7 +1548,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _buildToggleButton(
-                      label: '아니오',
+                      label: l10n.no,
                       selected: !_needsWheelchair,
                       onTap: () {
                         setState(() {
@@ -1469,7 +1576,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                   ),
                   child: Text(
-                    _isSaving ? '저장 중...' : '수정 완료',
+                    _isSaving ? l10n.saveInProgress : l10n.saveChanges,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
@@ -1581,9 +1688,10 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   }
 
   Future<void> _pickTime(
-      TextEditingController controller, {
-        bool isStartTime = false,
-      }) async {
+    TextEditingController controller, {
+    bool isStartTime = false,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
     final currentMinute = _parseTimeToMinute(controller.text) ?? 9 * 60;
 
     final now = DateTime.now();
@@ -1608,16 +1716,19 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 child: Row(
                   children: [
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
                       },
-                      child: const Text(
-                        '취소',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.cancel,
+                        style: const TextStyle(
                           color: Color(0xFF6B7280),
                           fontWeight: FontWeight.w700,
                         ),
@@ -1626,10 +1737,16 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                     const Spacer(),
                     TextButton(
                       onPressed: () {
-                        final pickedMinute = selectedTime.hour * 60 + selectedTime.minute;
+                        final pickedMinute =
+                            selectedTime.hour * 60 + selectedTime.minute;
 
-                        final hourText = selectedTime.hour.toString().padLeft(2, '0');
-                        final minuteText = selectedTime.minute.toString().padLeft(2, '0');
+                        final hourText = selectedTime.hour.toString().padLeft(
+                          2,
+                          '0',
+                        );
+                        final minuteText = selectedTime.minute
+                            .toString()
+                            .padLeft(2, '0');
 
                         setState(() {
                           controller.text = '$hourText:$minuteText';
@@ -1637,9 +1754,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                           // 시작 시간을 고른 경우,
                           // 종료 시간이 시작 시간보다 빠르거나 같으면 자동으로 시작 + 1시간으로 보정
                           if (isStartTime) {
-                            final currentEndMinute = _parseTimeToMinute(_endTimeController.text);
+                            final currentEndMinute = _parseTimeToMinute(
+                              _endTimeController.text,
+                            );
 
-                            if (currentEndMinute == null || currentEndMinute <= pickedMinute) {
+                            if (currentEndMinute == null ||
+                                currentEndMinute <= pickedMinute) {
                               int adjustedEndMinute = pickedMinute + 60;
 
                               // 23:55를 넘어가지 않도록 제한
@@ -1647,16 +1767,18 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 adjustedEndMinute = 23 * 60 + 55;
                               }
 
-                              _endTimeController.text = _formatMinute(adjustedEndMinute);
+                              _endTimeController.text = _formatMinute(
+                                adjustedEndMinute,
+                              );
                             }
                           }
                         });
 
                         Navigator.pop(context);
                       },
-                      child: const Text(
-                        '완료',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.done,
+                        style: const TextStyle(
                           color: Color(0xFF2563EB),
                           fontWeight: FontWeight.w900,
                         ),
@@ -1698,11 +1820,11 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   }
 
   bool _hasOverlappingClass(
-      String day,
-      int startMinute,
-      int endMinute, {
-        int? exceptScheduleId,
-      }) {
+    String day,
+    int startMinute,
+    int endMinute, {
+    int? exceptScheduleId,
+  }) {
     return _timetable.any((entry) {
       if (exceptScheduleId != null && entry.id == exceptScheduleId) {
         return false;
@@ -1763,12 +1885,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   }
 
   void _startEditClass(int index) {
+    final l10n = AppLocalizations.of(context)!;
     final entry = _timetable[index];
 
     if (entry.id == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('수정할 시간표 정보를 찾을 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.timetableEditInfoMissing)));
       return;
     }
 
@@ -1787,20 +1910,21 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   }
 
   Future<void> _updateClass() async {
+    final l10n = AppLocalizations.of(context)!;
     final userId = widget.userId;
     final scheduleId = _editingScheduleId;
 
     if (userId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
     if (scheduleId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('수정할 시간표를 선택해주세요.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.selectTimetableToEdit)));
       return;
     }
 
@@ -1812,7 +1936,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     if (_selectedDays.length != 1) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('수정할 요일은 하나만 선택해주세요.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.selectOneDayToEdit)));
       return;
     }
 
@@ -1827,7 +1951,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
     if (hasOverlap) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$selectedDay요일 같은 시간대에 이미 수업이 있습니다.')),
+        SnackBar(
+          content: Text(l10n.classTimeOverlap(_dayDisplayText(selectedDay))),
+        ),
       );
       return;
     }
@@ -1856,18 +1982,18 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('시간표가 수정되었습니다.')));
+        ).showSnackBar(SnackBar(content: Text(l10n.timetableUpdated)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? '시간표 수정에 실패했습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.timetableUpdateFailed)));
       }
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     } finally {
       if (mounted) {
         setState(() {
@@ -1878,12 +2004,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
   }
 
   Future<void> _addClass() async {
+    final l10n = AppLocalizations.of(context)!;
     final userId = widget.userId;
 
     if (userId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
@@ -1899,7 +2026,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     if (overlappingDay.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${overlappingDay.first}요일 같은 시간대에 이미 수업이 있습니다.'),
+          content: Text(
+            l10n.classTimeOverlap(_dayDisplayText(overlappingDay.first)),
+          ),
         ),
       );
       return;
@@ -1923,9 +2052,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
         if (result['success'] != true) {
           if (!mounted) return;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message'] ?? '시간표 추가에 실패했습니다.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.timetableAddFailed)));
           return;
         }
       }
@@ -1938,13 +2067,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('시간표가 추가되었습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.timetableAdded)));
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     } finally {
       if (mounted) {
         setState(() {
@@ -1964,13 +2093,33 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     return '$hourText:$minuteText';
   }
 
+  String _dayDisplayText(String day) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (day) {
+      case '월':
+        return l10n.mondayShort;
+      case '화':
+        return l10n.tuesdayShort;
+      case '수':
+        return l10n.wednesdayShort;
+      case '목':
+        return l10n.thursdayShort;
+      case '금':
+        return l10n.fridayShort;
+      default:
+        return day;
+    }
+  }
+
   Future<void> _deleteClass(int index) async {
+    final l10n = AppLocalizations.of(context)!;
     final userId = widget.userId;
 
     if (userId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
@@ -1979,7 +2128,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
     if (entry.id == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('삭제할 시간표 정보를 찾을 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.timetableDeleteInfoMissing)));
       return;
     }
 
@@ -1996,24 +2145,28 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('시간표가 삭제되었습니다.')));
+        ).showSnackBar(SnackBar(content: Text(l10n.timetableDeleted)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? '시간표 삭제에 실패했습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.timetableDeleteFailed)));
       }
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('서버에 연결할 수 없습니다.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.serverConnectionFailed)));
     }
   }
 
   void _confirmDeleteClass(int index) {
     final entry = _timetable[index];
 
+    final l10n = AppLocalizations.of(context)!;
+    final dayText = _dayDisplayText(entry.day);
+    final timeText =
+        '${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}';
     showDialog(
       context: context,
       builder: (context) {
@@ -2021,13 +2174,12 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            '수업 삭제',
-            style: TextStyle(fontWeight: FontWeight.w900),
+          title: Text(
+            l10n.deleteClassTitle,
+            style: const TextStyle(fontWeight: FontWeight.w900),
           ),
           content: Text(
-            '${entry.day}요일 ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}\n'
-            '${entry.room} 수업을 삭제할까요?',
+            l10n.deleteClassMessage(dayText, timeText, entry.room),
             style: const TextStyle(fontSize: 14, height: 1.5),
           ),
           actions: [
@@ -2035,9 +2187,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text(
-                '취소',
-                style: TextStyle(
+              child: Text(
+                l10n.cancel,
+                style: const TextStyle(
                   color: Color(0xFF6B7280),
                   fontWeight: FontWeight.w700,
                 ),
@@ -2048,9 +2200,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                 Navigator.pop(context);
                 await _deleteClass(index);
               },
-              child: const Text(
-                '삭제',
-                style: TextStyle(
+              child: Text(
+                l10n.deleteButton,
+                style: const TextStyle(
                   color: Color(0xFFDC2626),
                   fontWeight: FontWeight.w900,
                 ),
@@ -2064,6 +2216,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
@@ -2094,21 +2247,21 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '시간표 편집',
-                        style: TextStyle(
+                        l10n.editTimetable,
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF111827),
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        '수업 정보를 입력하세요',
-                        style: TextStyle(
+                        l10n.enterClassInfo,
+                        style: const TextStyle(
                           fontSize: 11,
                           color: Color(0xFF9CA3AF),
                         ),
@@ -2127,18 +2280,18 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                 child: Column(
                   children: [
                     _sectionCard(
-                      title: '현재 시간표',
+                      title: l10n.currentTimetable,
                       child: TimetableGrid(timetable: _timetable),
                     ),
 
                     const SizedBox(height: 16),
 
                     _sectionCard(
-                      title: _isEditing ? '수업 수정' : '수업 추가',
+                      title: _isEditing ? l10n.editClass : l10n.addClass,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('요일'),
+                          _buildLabel(l10n.dayLabel),
                           const SizedBox(height: 8),
 
                           Row(
@@ -2178,7 +2331,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                       borderRadius: BorderRadius.circular(9),
                                     ),
                                     child: Text(
-                                      day,
+                                      _dayDisplayText(day),
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 13,
@@ -2202,11 +2355,11 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _buildLabel('시작 시간'),
+                                    _buildLabel(l10n.startTimeLabel),
                                     const SizedBox(height: 8),
                                     _buildTextField(
                                       controller: _startTimeController,
-                                      hintText: '예: 09:15',
+                                      hintText: l10n.exampleTime,
                                       readOnly: true,
                                       onTap: () => _pickTime(
                                         _startTimeController,
@@ -2221,13 +2374,14 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _buildLabel('종료 시간'),
+                                    _buildLabel(l10n.endTimeLabel),
                                     const SizedBox(height: 8),
                                     _buildTextField(
                                       controller: _endTimeController,
-                                      hintText: '예: 10:45',
+                                      hintText: l10n.exampleEndTime,
                                       readOnly: true,
-                                      onTap: () => _pickTime(_endTimeController),
+                                      onTap: () =>
+                                          _pickTime(_endTimeController),
                                     ),
                                   ],
                                 ),
@@ -2237,7 +2391,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
 
                           const SizedBox(height: 18),
 
-                          _buildLabel('강의실'),
+                          _buildLabel(l10n.classroomLabel),
                           const SizedBox(height: 8),
 
                           Row(
@@ -2300,7 +2454,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                 flex: 2,
                                 child: _buildTextField(
                                   controller: _roomNumberController,
-                                  hintText: '예: 101',
+                                  hintText: l10n.exampleRoom,
                                   keyboardType: TextInputType.text,
                                 ),
                               ),
@@ -2334,13 +2488,13 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                               ),
                               child: Text(
                                 _isUpdatingClass
-                                    ? '수정 중...'
+                                    ? l10n.updatingClass
                                     : _isAddingClass
-                                      ? '추가 중...'
-                                      : _isEditing
-                                        ? '수정 완료'
-                                        : '수업 추가',
-                                style: TextStyle(
+                                    ? l10n.addingClass
+                                    : _isEditing
+                                    ? l10n.updateClassDone
+                                    : l10n.addClass,
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -2353,9 +2507,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                               width: double.infinity,
                               child: TextButton(
                                 onPressed: _resetClassForm,
-                                child: const Text(
-                                  '수정 취소',
-                                  style: TextStyle(
+                                child: Text(
+                                  l10n.cancelEdit,
+                                  style: const TextStyle(
                                     color: Color(0xFF6B7280),
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -2371,7 +2525,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                       const SizedBox(height: 16),
 
                       _sectionCard(
-                        title: '수업 목록',
+                        title: l10n.classList,
                         child: Column(
                           children: List.generate(_timetable.length, (index) {
                             final entry = _timetable[index];
@@ -2410,7 +2564,7 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          '${entry.day}요일 ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}',
+                                          '${_dayDisplayText(entry.day)} ${_formatMinute(entry.startMinute)}~${_formatMinute(entry.endMinute)}',
                                           style: const TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w900,
@@ -2494,9 +2648,9 @@ class _TimetableEditScreenState extends State<TimetableEditScreen> {
                             borderRadius: BorderRadius.circular(13),
                           ),
                         ),
-                        child: const Text(
-                          '완료',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.done,
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w900,
                           ),
@@ -2624,14 +2778,30 @@ class TimetableGrid extends StatelessWidget {
       return [_defaultStartHour];
     }
 
-    return List.generate(
-      endHour - startHour,
-          (index) => startHour + index,
-    );
+    return List.generate(endHour - startHour, (index) => startHour + index);
   }
 
   String _formatHourLabel(int hour) {
     return hour.toString().padLeft(2, '0');
+  }
+
+  String _dayDisplayText(BuildContext context, String day) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (day) {
+      case '월':
+        return l10n.mondayShort;
+      case '화':
+        return l10n.tuesdayShort;
+      case '수':
+        return l10n.wednesdayShort;
+      case '목':
+        return l10n.thursdayShort;
+      case '금':
+        return l10n.fridayShort;
+      default:
+        return day;
+    }
   }
 
   String _shortRoomName(String room) {
@@ -2685,7 +2855,7 @@ class TimetableGrid extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(7),
                               ),
                               child: Text(
-                                day,
+                                _dayDisplayText(context, day),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 12,
@@ -2731,7 +2901,9 @@ class TimetableGrid extends StatelessWidget {
                                   final int cellStart = hour * 60;
                                   final int cellEnd = (hour + 1) * 60;
 
-                                  final bool isOccupied = timetable.any((entry) {
+                                  final bool isOccupied = timetable.any((
+                                    entry,
+                                  ) {
                                     return entry.day == day &&
                                         entry.startMinute < cellEnd &&
                                         entry.endMinute > cellStart;
@@ -2767,79 +2939,82 @@ class TimetableGrid extends StatelessWidget {
                           return timetable
                               .where((entry) => entry.day == day)
                               .map((entry) {
-                            // 표시 범위 밖의 수업은 그리지 않음
-                            if (entry.endMinute <= timetableStartMinute ||
-                                entry.startMinute >= timetableEndMinute) {
-                              return const SizedBox.shrink();
-                            }
+                                // 표시 범위 밖의 수업은 그리지 않음
+                                if (entry.endMinute <= timetableStartMinute ||
+                                    entry.startMinute >= timetableEndMinute) {
+                                  return const SizedBox.shrink();
+                                }
 
-                            // 표시 범위를 벗어나는 수업은 보이는 구간만 잘라서 표시
-                            final int visibleStart =
-                            entry.startMinute < timetableStartMinute
-                                ? timetableStartMinute
-                                : entry.startMinute;
+                                // 표시 범위를 벗어나는 수업은 보이는 구간만 잘라서 표시
+                                final int visibleStart =
+                                    entry.startMinute < timetableStartMinute
+                                    ? timetableStartMinute
+                                    : entry.startMinute;
 
-                            final int visibleEnd =
-                            entry.endMinute > timetableEndMinute
-                                ? timetableEndMinute
-                                : entry.endMinute;
+                                final int visibleEnd =
+                                    entry.endMinute > timetableEndMinute
+                                    ? timetableEndMinute
+                                    : entry.endMinute;
 
-                            final double top =
-                                ((visibleStart - timetableStartMinute) / 60) *
+                                final double top =
+                                    ((visibleStart - timetableStartMinute) /
+                                        60) *
                                     (_rowHeight + _gap);
 
-                            final double left = _timeColumnWidth +
-                                dayIndex * (_dayColumnWidth + _gap);
+                                final double left =
+                                    _timeColumnWidth +
+                                    dayIndex * (_dayColumnWidth + _gap);
 
-                            final double calculatedHeight =
-                                ((visibleEnd - visibleStart) / 60) *
-                                    (_rowHeight + _gap) -
+                                final double calculatedHeight =
+                                    ((visibleEnd - visibleStart) / 60) *
+                                        (_rowHeight + _gap) -
                                     _gap;
 
-                            final double blockHeight =
-                            calculatedHeight < 24 ? 24 : calculatedHeight;
+                                final double blockHeight = calculatedHeight < 24
+                                    ? 24
+                                    : calculatedHeight;
 
-                            return Positioned(
-                              top: top,
-                              left: left,
-                              width: _dayColumnWidth,
-                              height: blockHeight,
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: _gap / 2,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: entry.color,
-                                  borderRadius: BorderRadius.circular(7),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: entry.color.withOpacity(0.25),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
+                                return Positioned(
+                                  top: top,
+                                  left: left,
+                                  width: _dayColumnWidth,
+                                  height: blockHeight,
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: _gap / 2,
                                     ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _shortRoomName(entry.room),
-                                    textAlign: TextAlign.center,
-                                    maxLines: blockHeight < 36 ? 1 : 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      height: 1.15,
-                                      fontWeight: FontWeight.w900,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: entry.color,
+                                      borderRadius: BorderRadius.circular(7),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: entry.color.withOpacity(0.25),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _shortRoomName(entry.room),
+                                        textAlign: TextAlign.center,
+                                        maxLines: blockHeight < 36 ? 1 : 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          height: 1.15,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
-                            );
-                          });
+                                );
+                              });
                         }),
                       ],
                     ),

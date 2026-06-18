@@ -1,0 +1,489 @@
+{
+  "appTitle": "KHU BUS",
+  "language": "Language",
+  "korean": "Korean",
+  "english": "English",
+  "homeTab": "Home",
+  "reservationTab": "Reservation",
+  "reportTab": "Report",
+  "profileTab": "Profile",
+  "login": "Login",
+  "loginSubtitle": "Log in to your account",
+  "username": "Username",
+  "enterUsername": "Enter your username",
+  "password": "Password",
+  "enterPassword": "Enter your password",
+  "autoLogin": "Auto login",
+  "signup": "Sign up",
+  "signupSubtitle": "Create a new account",
+  "confirmPassword": "Confirm password",
+  "reenterPassword": "Re-enter your password",
+  "phoneNumber": "Phone number",
+  "wheelchairUser": "Wheelchair user",
+  "yes": "Yes",
+  "no": "No",
+  "createAccount": "Create account",
+  "backToLogin": "Already have an account? Log in",
+  "enterUsernameAndPassword": "Please enter your username and password.",
+  "loginSuccess": "Logged in successfully.",
+  "loginFailed": "Login failed.",
+  "serverConnectionFailed": "Unable to connect to the server.",
+  "fillAllFields": "Please fill in all fields.",
+  "phoneNumberFourDigits": "Please enter 4 digits for each phone number field.",
+  "passwordsDoNotMatch": "Passwords do not match.",
+  "signupSuccess": "Account created successfully.",
+  "signupFailed": "Sign-up failed.",
+  "profileInfo": "Profile information",
+  "noRegisteredPhone": "No phone number registered",
+  "timetable": "Timetable",
+  "logout": "Log out",
+  "editProfile": "Edit profile",
+  "enterFullPhoneNumber": "Please enter your full phone number.",
+  "profileUpdateSuccess": "Profile updated successfully.",
+  "profileUpdateFailed": "Failed to update profile.",
+  "saveInProgress": "Saving...",
+  "saveChanges": "Save changes",
+  "homeTitle": "Classroom Route Guide",
+  "homeSubtitle": "We recommend the best way to get there",
+  "departureStation": "Select departure stop",
+  "mainGateStation": "Main Gate",
+  "oedaeStation": "Foreign",
+  "jeonjeongdaeStation": "Electronics",
+  "classUntil": "Until class",
+  "congestion": "Crowding",
+  "waitingPeople": "Waiting",
+  "congestionLight": "Light",
+  "congestionNormal": "Normal",
+  "congestionBusy": "Busy",
+  "congestionCrowded": "Crowded",
+  "noInfo": "No info",
+  "peopleCount": "{count} people",
+  "@peopleCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recommendedTransport": "Recommended transport",
+  "busRecommended": "Bus recommended",
+  "walkRecommended": "Walking recommended",
+  "walkingSelected": "Walking selected",
+  "boardingEstimate": "Boarding estimate",
+  "busArrival": "Bus arrival",
+  "estimatedArrivalTime": "Estimated arrival",
+  "afterMinutes": "In about {minute} min",
+  "@afterMinutes": {
+    "placeholders": {
+      "minute": {
+        "type": "int"
+      }
+    }
+  },
+  "busArrivesIn": "Bus {bus} arrives {arrival}",
+  "@busArrivesIn": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      },
+      "arrival": {
+        "type": "String"
+      }
+    }
+  },
+  "noWalkingEstimate": "No next class info.\nWalking time cannot be estimated.",
+  "walkingEstimate": "It takes about {minute} min to walk to your next class.",
+  "@walkingEstimate": {
+    "placeholders": {
+      "minute": {
+        "type": "int"
+      }
+    }
+  },
+  "busArrivingSoon": "Bus {bus} is arriving soon",
+  "@busArrivingSoon": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      }
+    }
+  },
+  "noBusServiceToday": "No bus service information today",
+  "transportMethodTitle": "Choose transport method",
+  "transportMethodSubtitle": "How would you like to go?",
+  "busQueue": "Join bus queue",
+  "noServiceInfo": "No service info",
+  "currentlyUnavailable": "Currently unavailable",
+  "checkBoardingEstimate": "Check boarding estimate",
+  "nearStopOnly": "Near stop only",
+  "walkMove": "Walk",
+  "checkWalkingTime": "Check walking time",
+  "locationPermissionNeeded": "📍 Location permission required",
+  "gettingLocation": "📍 Getting location...",
+  "noLocationInfo": "📍 No location information",
+  "currentLocationNearStation": "📍 Current location: near the stop ({distance} · within 50m)",
+  "@currentLocationNearStation": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "currentLocationToStation": "📍 Current location: {distance} from the stop\n(over 50m)",
+  "@currentLocationToStation": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "busWaiting": "Waiting for bus",
+  "walkingInProgress": "Walking",
+  "stationStop": "📍 {station} stop",
+  "@stationStop": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "includedInWaitingList": "You have been added to the waiting count",
+  "cancelWaiting": "Cancel waiting",
+  "cancelMove": "Cancel",
+  "reservationSubtitle": "Support feature for wheelchair users.",
+  "pleaseSelectStop": "Please select a stop",
+  "timeHeader": "Time",
+  "reservationHeader": "Reservation",
+  "ticket": "Ticket",
+  "reserved": "Reserved",
+  "reservationUnavailable": "Unavailable",
+  "makeReservation": "Reserve",
+  "reservationLoadFailed": "Failed to load reservations.",
+  "reservationNotAvailableTitle": "Reservation unavailable",
+  "invalidReservationTime": "This time is not available for reservation.",
+  "alreadyReservedTime": "This time slot is already reserved.",
+  "alreadyHasReservation": "You already have a reservation.",
+  "alreadyHasSameTimeReservation": "You already have a reservation at another stop at the same time.",
+  "notReservationTarget": "You are not eligible to use this reservation feature.",
+  "weekendReservationUnavailable": "Reservations are not available on weekends.",
+  "ok": "OK",
+  "loginRequired": "Login required.",
+  "reservationSuccess": "Reservation completed.",
+  "reservationFailed": "Failed to make reservation.",
+  "reservationCancelSuccess": "Reservation canceled.",
+  "reservationCancelFailed": "Failed to cancel reservation.",
+  "reservationResultUnknown": "Unable to check reservation result.",
+  "reservationCancelResultUnknown": "Unable to check cancellation result.",
+  "ticketTitle": "Ticket",
+  "stopLabel": "Stop",
+  "boardingBusLabel": "Bus",
+  "classTimeLabel": "Class time",
+  "arriveFiveMinutesEarly": "Please arrive at the stop 5 minutes before boarding.",
+  "lowFloorBus9": "Low-floor bus 9",
+  "lowFloorBus9Scheduled": "Low-floor bus 9 ({time} scheduled)",
+  "@lowFloorBus9Scheduled": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "busArrivalInfoLoadFailed": "Failed to load low-floor bus 9 arrival information.",
+  "busArrivalInfoNotReady": "Low-floor bus 9 arrival information is not available yet.",
+  "reservationCompletedTitle": "Reserved",
+  "reservationCompletedMessage": "Your reservation for {stop} stop at {time} is complete.",
+  "@reservationCompletedMessage": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "close": "Close",
+  "cancelReservation": "Cancel reservation",
+  "reportTitle": "Real-time Crowding Report",
+  "reportSubtitle": "Report how crowded the stop feels in real time.",
+  "reportLocation": "Report location",
+  "selectLocation": "Select location",
+  "feltCongestion": "Felt crowding",
+  "selectCongestion": "Select crowding",
+  "reportUnavailable": "Report unavailable",
+  "reportNearStopOnly": "Report near stop only",
+  "submitReport": "Submit report",
+  "realtimeReportStatus": "Real-time report status",
+  "reportStatusSubtitle": "Check real-time crowding data reported by students.",
+  "totalReports": "{count} reports",
+  "@totalReports": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportCount": "{count}",
+  "@reportCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recentReportNotice": "* Data is based on student crowding reports from the last 5 minutes.",
+  "cctvSupplementNotice": "Crowding reports supplement CCTV waiting counts for boarding estimates.",
+  "selectStopToCheckDistance": "Select a stop to check your distance from it.",
+  "testModeNearStop": "Test mode: treated as near {station} stop.\nYou can report. (0m)",
+  "@testModeNearStop": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "cannotCheckLocation": "Unable to check your current location. Please check location permission and GPS settings.",
+  "checkingLocation": "Checking your current location. Please try again shortly.",
+  "cannotCheckStopLocation": "Unable to check stop location information.",
+  "nearSelectedStop": "You are near {station} stop.\nYou can report. ({distance})",
+  "@nearSelectedStop": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "reportOnlyWithin50m": "Reports are only available within 50m of the stop.\nCurrent distance: {distance}",
+  "@reportOnlyWithin50m": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "weekendReportUnavailable": "Crowding reports are not available on weekends.",
+  "selectReportLocationMessage": "Please select a report location.",
+  "selectCongestionMessage": "Please select felt crowding.",
+  "reportSubmitSuccess": "[{location}] {congestion} report submitted!\nYou can report again in 5 minutes.",
+  "@reportSubmitSuccess": {
+    "placeholders": {
+      "location": { "type": "String" },
+      "congestion": { "type": "String" }
+    }
+  },
+  "reportSubmitFailed": "Failed to save report.",
+  "cooldownTitle": "Wait!",
+  "cooldownMessage": "You can report once every 5 minutes near a stop.\n\n⏱ You can report again after {time}",
+  "@cooldownMessage": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "canReportAfter": "Available again after {time}",
+  "@canReportAfter": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "cooldownMinutesSeconds": "{minutes}m {seconds}s",
+  "@cooldownMinutesSeconds": {
+    "placeholders": {
+      "minutes": { "type": "int" },
+      "seconds": { "type": "int" }
+    }
+  },
+  "cooldownSeconds": "{seconds}s",
+  "@cooldownSeconds": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "editTimetable": "Edit timetable",
+  "enterClassInfo": "Enter class information",
+  "currentTimetable": "Current timetable",
+  "addClass": "Add class",
+  "editClass": "Edit class",
+  "dayLabel": "Day",
+  "startTimeLabel": "Start time",
+  "endTimeLabel": "End time",
+  "classroomLabel": "Classroom",
+  "addingClass": "Adding...",
+  "updatingClass": "Updating...",
+  "updateClassDone": "Save changes",
+  "cancelEdit": "Cancel edit",
+  "classList": "Class list",
+  "done": "Done",
+  "cancel": "Cancel",
+  "exampleTime": "Ex: 09:15",
+  "exampleEndTime": "Ex: 10:45",
+  "exampleRoom": "Ex: 101",
+  "mondayShort": "Mon",
+  "tuesdayShort": "Tue",
+  "wednesdayShort": "Wed",
+  "thursdayShort": "Thu",
+  "fridayShort": "Fri",
+  "deleteClassMessage": "{day} {time}\nDelete {room} class?",
+  "@deleteClassMessage": {
+    "placeholders": {
+      "day": { "type": "String" },
+      "time": { "type": "String" },
+      "room": { "type": "String" }
+    }
+  },
+  "deleteClassTitle": "Delete class",
+  "deleteButton": "Delete",
+  "timetableDeleted": "Timetable entry deleted.",
+  "timetableDeleteFailed": "Failed to delete timetable entry.",
+  "boardingPredictionTitle": "My boarding estimate",
+  "expectedBoardingBus": "Expected bus",
+  "noBoardableBusFound": "No boardable bus was found\namong currently available buses.",
+  "arrivalScheduledText": "Arrives {arrival} · {time}",
+  "@arrivalScheduledText": {
+    "placeholders": {
+      "arrival": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "waitingCountAtStart": "Waiting count when joined",
+  "expectedBoardingOrder": "Expected boarding order",
+  "arrivalOrderBus": "Arriving bus #{order}",
+  "@arrivalOrderBus": {
+    "placeholders": {
+      "order": { "type": "int" }
+    }
+  },
+  "boardingCompletedMessage": "Marked as boarded.",
+  "expectedBusListTitle": "Expected arriving buses",
+  "nextBoardingPredictionLoadFailed": "Failed to load the next boarding estimate.",
+  "boardableExpected": "Likely boardable",
+  "cannotJudge": "Cannot determine",
+  "boardingDifficult": "Difficult to board",
+  "afterRecommendedBus": "After recommended",
+  "previousRecommendedBus": "Previous recommended bus",
+  "notBoarded": "Not boarded",
+  "noBoardingDecisionInfo": "No boarding decision info",
+  "expectedBusArrivedTitle": "Your expected bus has arrived",
+  "expectedBusArrivedSubtitle": "Select whether you boarded to continue guidance.",
+  "boardedCompleteButton": "I boarded",
+  "checkingNow": "Checking...",
+  "stillWaiting": "Still waiting",
+  "busNumberLabel": "Bus {busNumber}",
+  "@busNumberLabel": {
+    "placeholders": {
+      "busNumber": { "type": "String" }
+    }
+  },
+  "arrivalInMinutes": "in {minute} min",
+  "@arrivalInMinutes": {
+    "placeholders": {
+      "minute": { "type": "int" }
+    }
+  },
+  "timetableLoadFailed": "Failed to load timetable.",
+  "timetableEditInfoMissing": "Could not find timetable information to edit.",
+  "selectTimetableToEdit": "Please select a timetable entry to edit.",
+  "selectOneDayToEdit": "Please select only one day to edit.",
+  "classTimeOverlap": "There is already a class at the same time on {day}.",
+  "@classTimeOverlap": {
+    "placeholders": {
+      "day": { "type": "String" }
+    }
+  },
+  "timetableUpdated": "Timetable updated.",
+  "timetableUpdateFailed": "Failed to update timetable.",
+  "timetableAdded": "Timetable entry added.",
+  "timetableAddFailed": "Failed to add timetable entry.",
+  "timetableDeleteInfoMissing": "Could not find timetable information to delete.",
+  "queueNoBusInfo": "Bus queue is unavailable because there is no current bus service information.",
+  "queueNearStationRequired": "You need to be near the stop to join the bus queue.",
+  "boardingPredictionLoadFailed": "Failed to load boarding estimate.",
+  "nextBus": "Next bus",
+  "nthBus": "Bus #{order}",
+  "@nthBus": {
+    "placeholders": {
+      "order": { "type": "int" }
+    }
+  },
+  "quickReportTitle": "How crowded does {station} stop feel right now?",
+  "@quickReportTitle": {
+    "placeholders": {
+      "station": { "type": "String" }
+    }
+  },
+  "quickReportSubtitle": "Submit a crowding report with one tap.",
+  "doLater": "Maybe later",
+  "quickReportCooldownAgain": "You can report again after {time}.",
+  "@quickReportCooldownAgain": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "quickReportSuccess": "[{station}] {level} report was reflected in the boarding estimate.",
+  "@quickReportSuccess": {
+    "placeholders": {
+      "station": { "type": "String" },
+      "level": { "type": "String" }
+    }
+  },
+  "recommendationReasonTitle": "Recommendation criteria",
+  "wheelchairReservationCount": "{count} wheelchair reservation(s)",
+  "@wheelchairReservationCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "wheelchairReservationExists": "Wheelchair reservation exists",
+  "reasonNoBusArrival": "No current bus arrival information is available, so walking should also be considered.",
+  "reasonNoWalkInfo": "Walking information is unavailable, so guidance is based on current bus arrival information.",
+  "reasonTooManyWaiting": "Many people are waiting, so nearby buses may be hard to board. Walking is recommended.",
+  "reasonBusTimeFits": "Bus is recommended based on the bus arrival time and the time left until your next class.",
+  "reasonWalkFaster": "Walking is recommended because the estimated travel time is shorter.",
+  "reasonBusTooLate": "Walking is recommended because the bus may not arrive in time for your next class.",
+  "reasonBusFaster": "Bus is recommended because the estimated travel time is shorter.",
+  "reasonBusFasterThanWalk": "Bus is recommended because it is expected to take less time than walking.",
+  "reasonNoNextClassBuilding": "No next class building information is available, so guidance is based on bus arrival information for the selected stop.",
+  "reasonMainGateEngineeringNoBus": "There is no bus route directly toward Engineering Hall from the Main Gate, so walking is recommended.",
+  "reasonNextClassNearStop": "Your next class building is near the selected stop, so walking is recommended.",
+  "reasonNoBusRouteToNextClass": "There is no available bus route from the selected stop toward your next class building, so walking is recommended.",
+  "reasonBusRouteRecommended": "Based on {routeText}, {minutes} min of travel time and bus waiting time are considered. Bus is recommended.",
+  "@reasonBusRouteRecommended": {
+    "placeholders": {
+      "routeText": { "type": "String" },
+      "minutes": { "type": "int" }
+    }
+  },
+  "capacityLowFloorAtStation": "Capacity: {base}\nCan board at {station}: {count}",
+  "@capacityLowFloorAtStation": {
+    "placeholders": {
+      "base": { "type": "int" },
+      "station": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "capacitySeatsAtStation": "Seats left: {base}\nCan board at {station}: {count}",
+  "@capacitySeatsAtStation": {
+    "placeholders": {
+      "base": { "type": "int" },
+      "station": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "ruleMainGate80": "Boarding estimate based on 80% boarding at Main Gate",
+  "capacityJeonjeongdae": "Seats left: 45\nCan board at Electronics: {count}",
+  "@capacityJeonjeongdae": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "ruleJeonjeongdae": "Boarding estimate based on expected boarders at the departure stop",
+  "noSeatInfo": "Seat information is unavailable",
+  "ruleMainGateBoardingReflected": "After {count} boarded at Main Gate",
+  "@ruleMainGateBoardingReflected": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
+}

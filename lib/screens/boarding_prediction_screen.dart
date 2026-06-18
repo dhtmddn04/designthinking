@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class BoardingPredictionScreen extends StatefulWidget {
   final String stationName;
@@ -37,6 +38,21 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
   bool _isRefreshing = false;
   bool _boardingCompleted = false;
 
+  String _stationDisplayName(BuildContext context, String station) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (station) {
+      case '정문':
+        return l10n.mainGateStation;
+      case '외대':
+        return l10n.oedaeStation;
+      case '전정대':
+        return l10n.jeonjeongdaeStation;
+      default:
+        return station;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,9 +75,57 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
         '-';
   }
 
-  String _busLabel(Map<String, dynamic> bus) {
+  String _busLabel(BuildContext context, Map<String, dynamic> bus) {
+    final l10n = AppLocalizations.of(context)!;
     final busNumber = bus['busNumber']?.toString() ?? '-';
-    return busNumber == '9' ? '9번 저상버스' : '$busNumber번';
+
+    if (busNumber == '9') {
+      return l10n.lowFloorBus9;
+    }
+
+    return l10n.busNumberLabel(busNumber);
+  }
+
+  String _displayArrivalText(BuildContext context, String raw) {
+    final l10n = AppLocalizations.of(context)!;
+    final isEnglish = Localizations.localeOf(context).languageCode == 'en';
+
+    if (!isEnglish) return raw;
+
+    final minuteMatch = RegExp(r'^(\d+)분 후$').firstMatch(raw);
+    if (minuteMatch != null) {
+      final minute = int.parse(minuteMatch.group(1)!);
+      return l10n.arrivalInMinutes(minute);
+    }
+
+    if (raw == '곧 출발') return 'soon';
+    if (raw == '오늘 운행 정보가 없습니다') return l10n.noBusServiceToday;
+    if (raw == '현재 도착 정보가 없습니다') return l10n.noServiceInfo;
+
+    return raw;
+  }
+
+  String _predictionText(BuildContext context, String raw) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (raw) {
+      case '탑승 가능 예상':
+        return l10n.boardableExpected;
+      case '판단 불가':
+        return l10n.cannotJudge;
+      case '탑승 어려움':
+        return l10n.boardingDifficult;
+      case '추천 버스 이후 도착':
+        return l10n.afterRecommendedBus;
+      case '이전 예상 버스':
+        return l10n.previousRecommendedBus;
+      case '탑승하지 않음':
+        return l10n.notBoarded;
+      case '탑승 판단 정보 없음':
+        return l10n.noBoardingDecisionInfo;
+      default:
+        return raw;
+    }
   }
 
   void _startArrivalTimer() {
@@ -97,6 +161,7 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
   }
 
   Future<void> _refreshBecauseStillWaiting() async {
+    final l10n = AppLocalizations.of(context)!;
     final currentBus = _recommendedBus;
     if (currentBus == null || _isRefreshing) return;
 
@@ -110,7 +175,7 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
 
       if (result == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('다음 탑승 예상 정보를 불러올 수 없습니다.')),
+          SnackBar(content: Text(l10n.nextBoardingPredictionLoadFailed)),
         );
         return;
       }
@@ -119,8 +184,7 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
         _waitingCountAtStart = result['waitingCountAtStart'] as int;
         _recommendedBus = result['recommendedBus'] as Map<String, dynamic>?;
         _arrivals = List<Map<String, dynamic>>.from(result['arrivals']);
-        _usesRealtimeWaitingCount =
-            result['usesRealtimeWaitingCount'] == true;
+        _usesRealtimeWaitingCount = result['usesRealtimeWaitingCount'] == true;
       });
 
       _startArrivalTimer();
@@ -142,10 +206,13 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bool hasRecommendation = _recommendedBus != null;
     final int? arrivalOrder = _recommendedBus?['arrivalOrder'] as int?;
-    final String ruleText =
-        _recommendedBus?['ruleText']?.toString() ?? '탑승 가능 예상';
+    final String ruleText = _predictionText(
+      context,
+      _recommendedBus?['ruleText']?.toString() ?? '탑승 가능 예상',
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
@@ -176,9 +243,9 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
           ),
         ),
         titleSpacing: 12,
-        title: const Text(
-          '내 탑승 예상',
-          style: TextStyle(
+        title: Text(
+          l10n.boardingPredictionTitle,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: Color(0xFF111827),
@@ -201,8 +268,8 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '예상 탑승 버스',
+                    Text(
+                      l10n.expectedBoardingBus,
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
@@ -212,7 +279,7 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                     const SizedBox(height: 10),
                     if (hasRecommendation) ...[
                       Text(
-                        _busLabel(_recommendedBus!),
+                        _busLabel(context, _recommendedBus!),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 27,
@@ -221,7 +288,13 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${_recommendedBus!['arrival']} 도착 예정 · ${_busTime(_recommendedBus!)}',
+                        l10n.arrivalScheduledText(
+                          _displayArrivalText(
+                            context,
+                            _recommendedBus!['arrival']?.toString() ?? '-',
+                          ),
+                          _busTime(_recommendedBus!),
+                        ),
                         style: const TextStyle(
                           color: Color(0xFFFFF176),
                           fontSize: 15,
@@ -238,8 +311,8 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                         ),
                       ),
                     ] else ...[
-                      const Text(
-                        '현재 확인 가능한 버스 중\n탑승 가능한 버스를 찾지 못했어요',
+                      Text(
+                        l10n.noBoardableBusFound,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 19,
@@ -262,17 +335,20 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                 ),
                 child: Column(
                   children: [
-                    _InfoRow(label: '정류장', value: widget.stationName),
+                    _InfoRow(
+                      label: l10n.stopLabel,
+                      value: _stationDisplayName(context, widget.stationName),
+                    ),
                     const SizedBox(height: 12),
                     _InfoRow(
-                      label: '줄서기 시작 당시 대기인원',
-                      value: '$_waitingCountAtStart명',
+                      label: l10n.waitingCountAtStart,
+                      value: l10n.peopleCount(_waitingCountAtStart),
                     ),
                     if (hasRecommendation && arrivalOrder != null) ...[
                       const SizedBox(height: 12),
                       _InfoRow(
-                        label: '예상 탑승 순서',
-                        value: '$arrivalOrder번째 도착 버스',
+                        label: l10n.expectedBoardingOrder,
+                        value: l10n.arrivalOrderBus(arrivalOrder),
                       ),
                     ],
                   ],
@@ -298,8 +374,8 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: const Color(0xFFBBF7D0)),
                   ),
-                  child: const Text(
-                    '탑승 완료로 처리되었습니다.',
+                  child: Text(
+                    l10n.boardingCompletedMessage,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF166534),
@@ -310,8 +386,8 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                 ),
               ],
               const SizedBox(height: 24),
-              const Text(
-                '도착 예정 버스 확인',
+              Text(
+                l10n.expectedBusListTitle,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w900,
@@ -321,11 +397,17 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
               const SizedBox(height: 12),
               ..._arrivals.map((bus) {
                 final bool isRecommended = bus['isRecommended'] == true;
-                final String capacityText =
-                    bus['capacityText']?.toString() ?? '탑승 판단 정보 없음';
+                final String capacityText = _predictionText(
+                  context,
+                  bus['capacityText']?.toString() ?? '탑승 판단 정보 없음',
+                );
+
                 final String statusText = isRecommended
-                    ? '탑승 가능 예상'
-                    : bus['statusText']?.toString() ?? '판단 불가';
+                    ? l10n.boardableExpected
+                    : _predictionText(
+                        context,
+                        bus['statusText']?.toString() ?? '판단 불가',
+                      );
 
                 return Container(
                   width: double.infinity,
@@ -364,7 +446,7 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _busLabel(bus),
+                              _busLabel(context, bus),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w900,
@@ -373,7 +455,7 @@ class _BoardingPredictionScreenState extends State<BoardingPredictionScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${bus['arrival']} · ${_busTime(bus)}',
+                              '${_displayArrivalText(context, bus['arrival']?.toString() ?? '-')} · ${_busTime(bus)}',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF6B7280),
@@ -433,6 +515,7 @@ class _ArrivalConfirmationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -444,8 +527,8 @@ class _ArrivalConfirmationCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '예상 버스가 도착했어요',
+          Text(
+            l10n.expectedBusArrivedTitle,
             style: TextStyle(
               color: Color(0xFF111827),
               fontSize: 16,
@@ -453,8 +536,8 @@ class _ArrivalConfirmationCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            '탑승 여부를 선택하면 안내를 이어갈 수 있어요.',
+          Text(
+            l10n.expectedBusArrivedSubtitle,
             style: TextStyle(
               color: Color(0xFF6B7280),
               fontSize: 13,
@@ -475,9 +558,9 @@ class _ArrivalConfirmationCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(11),
                     ),
                   ),
-                  child: const Text(
-                    '탑승 완료',
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                  child: Text(
+                    l10n.boardedCompleteButton,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -494,7 +577,7 @@ class _ArrivalConfirmationCard extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    isRefreshing ? '확인 중...' : '아직 대기 중',
+                    isRefreshing ? l10n.checkingNow : l10n.stillWaiting,
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),

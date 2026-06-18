@@ -1,0 +1,506 @@
+{
+  "appTitle": "KHU BUS",
+  "language": "언어",
+  "korean": "한국어",
+  "english": "English",
+  "homeTab": "홈",
+  "reservationTab": "예약",
+  "reportTab": "제보",
+  "profileTab": "프로필",
+  "login": "로그인",
+  "loginSubtitle": "계정에 로그인하세요",
+  "username": "아이디",
+  "enterUsername": "아이디를 입력하세요",
+  "password": "비밀번호",
+  "enterPassword": "비밀번호를 입력하세요",
+  "autoLogin": "자동 로그인",
+  "signup": "회원가입",
+  "signupSubtitle": "새 계정을 만들어보세요",
+  "confirmPassword": "비밀번호 재확인",
+  "reenterPassword": "비밀번호를 다시 입력하세요",
+  "phoneNumber": "휴대전화",
+  "wheelchairUser": "휠체어 탑승 여부",
+  "yes": "예",
+  "no": "아니오",
+  "createAccount": "가입하기",
+  "backToLogin": "이미 계정이 있으신가요? 로그인",
+  "enterUsernameAndPassword": "아이디와 비밀번호를 입력해주세요.",
+  "loginSuccess": "로그인되었습니다.",
+  "loginFailed": "로그인에 실패했습니다.",
+  "serverConnectionFailed": "서버에 연결할 수 없습니다.",
+  "fillAllFields": "모든 정보를 입력해주세요.",
+  "phoneNumberFourDigits": "휴대전화 번호는 4자리씩 입력해주세요.",
+  "passwordsDoNotMatch": "비밀번호가 일치하지 않습니다.",
+  "signupSuccess": "회원가입이 완료되었습니다.",
+  "signupFailed": "회원가입에 실패했습니다.",
+  "profileInfo": "프로필 정보",
+  "noRegisteredPhone": "등록된 번호 없음",
+  "timetable": "시간표",
+  "logout": "로그아웃",
+  "editProfile": "프로필 수정",
+  "enterFullPhoneNumber": "휴대전화 번호를 모두 입력해주세요.",
+  "profileUpdateSuccess": "프로필이 수정되었습니다.",
+  "profileUpdateFailed": "프로필 수정에 실패했습니다.",
+  "saveInProgress": "저장 중...",
+  "saveChanges": "수정 완료",
+  "homeTitle": "강의실 이동 안내",
+  "homeSubtitle": "최적의 이동 수단을 추천합니다",
+  "departureStation": "출발 정류장 선택",
+  "mainGateStation": "정문",
+  "oedaeStation": "외대",
+  "jeonjeongdaeStation": "전정대",
+  "classUntil": "수업까지",
+  "congestion": "혼잡도",
+  "waitingPeople": "대기인원",
+  "congestionLight": "여유",
+  "congestionNormal": "보통",
+  "congestionBusy": "약간 혼잡",
+  "congestionCrowded": "혼잡",
+  "noInfo": "정보 없음",
+  "peopleCount": "{count}명",
+  "@peopleCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recommendedTransport": "추천 이동 수단",
+  "busRecommended": "버스 탑승을 권장합니다",
+  "walkRecommended": "도보 이동을 권장합니다",
+  "walkingSelected": "도보 이동을 선택했습니다",
+  "boardingEstimate": "탑승 예상",
+  "busArrival": "버스 도착",
+  "estimatedArrivalTime": "예상 도착시간",
+  "afterMinutes": "약 {minute}분 후",
+  "@afterMinutes": {
+    "placeholders": {
+      "minute": {
+        "type": "int"
+      }
+    }
+  },
+  "busArrivesIn": "{bus} 버스가 {arrival} 도착합니다",
+  "@busArrivesIn": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      },
+      "arrival": {
+        "type": "String"
+      }
+    }
+  },
+  "noWalkingEstimate": "다음 수업 정보가 없어\n예상 도보 시간을 계산할 수 없어요.",
+  "walkingEstimate": "다음 수업 건물까지 걸어서 약 {minute}분 걸려요.",
+  "@walkingEstimate": {
+    "placeholders": {
+      "minute": {
+        "type": "int"
+      }
+    }
+  },
+  "busArrivingSoon": "{bus} 버스가 곧 도착합니다",
+  "@busArrivingSoon": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      }
+    }
+  },
+  "noBusServiceToday": "오늘 운행 정보가 없습니다",
+  "transportMethodTitle": "이동 방법 선택",
+  "transportMethodSubtitle": "어떻게 이동하시겠어요?",
+  "busQueue": "버스 줄서기",
+  "noServiceInfo": "운행 정보 없음",
+  "currentlyUnavailable": "현재 이용 불가",
+  "checkBoardingEstimate": "내 탑승 예상 확인",
+  "nearStopOnly": "정류장 근처에서만",
+  "walkMove": "도보 이동",
+  "checkWalkingTime": "예상 도보 시간 확인",
+  "locationPermissionNeeded": "📍 위치 권한이 필요합니다",
+  "gettingLocation": "📍 위치 정보를 가져오는 중...",
+  "noLocationInfo": "📍 위치 정보 없음",
+  "currentLocationNearStation": "📍 현재 위치: 정류장 근처 ({distance} · 50m 이내)",
+  "@currentLocationNearStation": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "currentLocationToStation": "📍 현재 위치: 정류장까지 {distance} (50m 이상)",
+  "@currentLocationToStation": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "busWaiting": "버스 대기 중",
+  "walkingInProgress": "도보 이동 중",
+  "stationStop": "📍 {station} 정류장",
+  "@stationStop": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "includedInWaitingList": "대기인원에 포함되었습니다",
+  "cancelWaiting": "대기 취소",
+  "cancelMove": "이동 취소",
+  "reservationSubtitle": "휠체어 사용자를 위한 지원 기능입니다.",
+  "pleaseSelectStop": "정류장을 선택해주세요",
+  "timeHeader": "시간",
+  "reservationHeader": "예약",
+  "ticket": "탑승권",
+  "reserved": "예약완료",
+  "reservationUnavailable": "예약불가",
+  "makeReservation": "예약하기",
+  "reservationLoadFailed": "예약 내역을 불러올 수 없습니다.",
+  "reservationNotAvailableTitle": "예약 불가",
+  "invalidReservationTime": "예약 가능한 시간이 아닙니다.",
+  "alreadyReservedTime": "이미 예약된 시간대입니다.",
+  "alreadyHasReservation": "이미 예약한 시간이 있습니다.",
+  "alreadyHasSameTimeReservation": "이미 같은 시간에 다른 정류장 예약이 있습니다.",
+  "notReservationTarget": "예약 기능 이용 대상자가 아닙니다.",
+  "weekendReservationUnavailable": "주말에는 예약 기능을 이용할 수 없습니다.",
+  "ok": "확인",
+  "loginRequired": "로그인이 필요합니다.",
+  "reservationSuccess": "예약이 완료되었습니다.",
+  "reservationFailed": "예약에 실패했습니다.",
+  "reservationCancelSuccess": "예약이 취소되었습니다.",
+  "reservationCancelFailed": "예약 취소에 실패했습니다.",
+  "reservationResultUnknown": "예약 결과를 확인할 수 없습니다.",
+  "reservationCancelResultUnknown": "예약 취소 결과를 확인할 수 없습니다.",
+  "ticketTitle": "탑승권",
+  "stopLabel": "정류장",
+  "boardingBusLabel": "이용 버스",
+  "classTimeLabel": "강의 시간",
+  "arriveFiveMinutesEarly": "탑승 5분 전까지 정류장에 도착해주세요",
+  "lowFloorBus9": "9번 저상버스",
+  "lowFloorBus9Scheduled": "9번 저상버스 ({time} 예정)",
+  "@lowFloorBus9Scheduled": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "busArrivalInfoLoadFailed": "9번 저상버스 도착정보를 불러올 수 없습니다.",
+  "busArrivalInfoNotReady": "9번 저상버스 도착정보가 아직 없습니다.",
+  "reservationCompletedTitle": "예약되었습니다",
+  "reservationCompletedMessage": "{stop} 정류장 {time} 예약이 완료되었습니다.",
+  "@reservationCompletedMessage": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "close": "닫기",
+  "cancelReservation": "예약 취소",
+  "reportTitle": "실시간 체감 혼잡도 제보",
+  "reportSubtitle": "실제 정류장에서 느낀 혼잡도를 제보해 주세요.",
+  "reportLocation": "제보 위치",
+  "selectLocation": "위치 선택",
+  "feltCongestion": "체감 혼잡도",
+  "selectCongestion": "혼잡도 선택",
+  "reportUnavailable": "제보 불가",
+  "reportNearStopOnly": "정류장 근처에서 제보 가능",
+  "submitReport": "제보하기",
+  "realtimeReportStatus": "실시간 제보 현황",
+  "reportStatusSubtitle": "학생들이 제보한 실시간 혼잡 데이터를 확인하세요.",
+  "totalReports": "전체 {count}건",
+  "@totalReports": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportCount": "{count}건",
+  "@reportCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recentReportNotice": "* 데이터는 최근 5분 이내 학생들의 체감 혼잡도 제보를 기반으로 합니다.",
+  "cctvSupplementNotice": "체감 혼잡도 제보는 CCTV 대기 인원을 보완해 탑승 예상 계산에 사용됩니다.",
+  "selectStopToCheckDistance": "제보할 정류장을 선택하면 현재 위치와의 거리를 확인할 수 있어요.",
+  "testModeNearStop": "테스트 모드: 현재 {station} 정류장 근처로 처리 중입니다.\n제보할 수 있어요. (0m)",
+  "@testModeNearStop": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "cannotCheckLocation": "현재 위치를 확인할 수 없어요. 위치 권한과 GPS 설정을 확인해 주세요.",
+  "checkingLocation": "현재 위치를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.",
+  "cannotCheckStopLocation": "정류장 위치 정보를 확인할 수 없어요.",
+  "nearSelectedStop": "현재 {station} 정류장 근처입니다. 제보할 수 있어요. ({distance})",
+  "@nearSelectedStop": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "reportOnlyWithin50m": "정류장 50m 이내에서만 제보할 수 있어요.\n현재 거리: {distance}",
+  "@reportOnlyWithin50m": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "weekendReportUnavailable": "주말에는 혼잡도 제보를 이용할 수 없습니다.",
+  "selectReportLocationMessage": "제보 위치를 선택해 주세요.",
+  "selectCongestionMessage": "체감 혼잡도를 선택해 주세요.",
+  "reportSubmitSuccess": "[{location}] {congestion} 제보 완료!\n5분 후 다시 제보할 수 있어요.",
+  "@reportSubmitSuccess": {
+    "placeholders": {
+      "location": { "type": "String" },
+      "congestion": { "type": "String" }
+    }
+  },
+  "reportSubmitFailed": "제보 저장에 실패했습니다.",
+  "cooldownTitle": "잠깐!",
+  "cooldownMessage": "제보는 정류장 근처에서 5분에 한 번만 가능해요.\n\n⏱ {time} 후 제보 가능합니다",
+  "@cooldownMessage": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "canReportAfter": "{time} 후 제보 가능합니다",
+  "@canReportAfter": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "cooldownMinutesSeconds": "{minutes}분 {seconds}초",
+  "@cooldownMinutesSeconds": {
+    "placeholders": {
+      "minutes": { "type": "int" },
+      "seconds": { "type": "int" }
+    }
+  },
+  "cooldownSeconds": "{seconds}초",
+  "@cooldownSeconds": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "editTimetable": "시간표 편집",
+  "enterClassInfo": "수업 정보를 입력하세요",
+  "currentTimetable": "현재 시간표",
+  "addClass": "수업 추가",
+  "editClass": "수업 수정",
+  "dayLabel": "요일",
+  "startTimeLabel": "시작 시간",
+  "endTimeLabel": "종료 시간",
+  "classroomLabel": "강의실",
+  "addingClass": "추가 중...",
+  "updatingClass": "수정 중...",
+  "updateClassDone": "수정 완료",
+  "cancelEdit": "수정 취소",
+  "classList": "수업 목록",
+  "done": "완료",
+  "cancel": "취소",
+  "exampleTime": "예: 09:15",
+  "exampleEndTime": "예: 10:45",
+  "exampleRoom": "예: 101",
+  "mondayShort": "월",
+  "tuesdayShort": "화",
+  "wednesdayShort": "수",
+  "thursdayShort": "목",
+  "fridayShort": "금",
+  "deleteClassMessage": "{day} {time}\n{room} 수업을 삭제할까요?",
+  "@deleteClassMessage": {
+    "placeholders": {
+      "day": { "type": "String" },
+      "time": { "type": "String" },
+      "room": { "type": "String" }
+    }
+  },
+  "deleteClassTitle": "수업 삭제",
+  "deleteButton": "삭제",
+  "timetableDeleted": "시간표가 삭제되었습니다.",
+  "timetableDeleteFailed": "시간표 삭제에 실패했습니다.",
+  "boardingPredictionTitle": "내 탑승 예상",
+  "expectedBoardingBus": "예상 탑승 버스",
+  "noBoardableBusFound": "현재 확인 가능한 버스 중\n탑승 가능한 버스를 찾지 못했어요",
+  "arrivalScheduledText": "{arrival} 도착 예정 · {time}",
+  "@arrivalScheduledText": {
+    "placeholders": {
+      "arrival": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "waitingCountAtStart": "줄서기 시작 당시 대기인원",
+  "expectedBoardingOrder": "예상 탑승 순서",
+  "arrivalOrderBus": "{order}번째 도착 버스",
+  "@arrivalOrderBus": {
+    "placeholders": {
+      "order": { "type": "int" }
+    }
+  },
+  "boardingCompletedMessage": "탑승 완료로 처리되었습니다.",
+  "expectedBusListTitle": "도착 예정 버스 확인",
+  "nextBoardingPredictionLoadFailed": "다음 탑승 예상 정보를 불러올 수 없습니다.",
+  "boardableExpected": "탑승 가능 예상",
+  "cannotJudge": "판단 불가",
+  "boardingDifficult": "탑승 어려움",
+  "afterRecommendedBus": "추천 버스 이후 도착",
+  "previousRecommendedBus": "이전 예상 버스",
+  "notBoarded": "탑승하지 않음",
+  "noBoardingDecisionInfo": "탑승 판단 정보 없음",
+  "expectedBusArrivedTitle": "예상 버스가 도착했어요",
+  "expectedBusArrivedSubtitle": "탑승 여부를 선택하면 안내를 이어갈 수 있어요.",
+  "boardedCompleteButton": "탑승 완료",
+  "checkingNow": "확인 중...",
+  "stillWaiting": "아직 대기 중",
+  "busNumberLabel": "{busNumber}번",
+  "@busNumberLabel": {
+    "placeholders": {
+      "busNumber": { "type": "String" }
+    }
+  },
+  "arrivalInMinutes": "{minute}분 후",
+  "@arrivalInMinutes": {
+    "placeholders": {
+      "minute": { "type": "int" }
+    }
+  },
+  "timetableLoadFailed": "시간표를 불러올 수 없습니다.",
+  "timetableEditInfoMissing": "수정할 시간표 정보를 찾을 수 없습니다.",
+  "selectTimetableToEdit": "수정할 시간표를 선택해주세요.",
+  "selectOneDayToEdit": "수정할 요일은 하나만 선택해주세요.",
+  "classTimeOverlap": "{day} 같은 시간대에 이미 수업이 있습니다.",
+  "@classTimeOverlap": {
+    "placeholders": {
+      "day": { "type": "String" }
+    }
+  },
+  "timetableUpdated": "시간표가 수정되었습니다.",
+  "timetableUpdateFailed": "시간표 수정에 실패했습니다.",
+  "timetableAdded": "시간표가 추가되었습니다.",
+  "timetableAddFailed": "시간표 추가에 실패했습니다.",
+  "timetableDeleteInfoMissing": "삭제할 시간표 정보를 찾을 수 없습니다.",
+  "queueNoBusInfo": "현재 버스 운행 정보가 없어 줄서기를 이용할 수 없어요.",
+  "queueNearStationRequired": "정류장 근처에 도착해야 버스 줄서기를 이용할 수 있어요.",
+  "boardingPredictionLoadFailed": "탑승 예상 정보를 불러올 수 없습니다.",
+  "nextBus": "다음 버스",
+  "nthBus": "{order}번째 버스",
+  "@nthBus": {
+    "placeholders": {
+      "order": { "type": "int" }
+    }
+  },
+  "quickReportTitle": "지금 {station} 정류장의\n체감 혼잡도는 어떤가요?",
+  "@quickReportTitle": {
+    "placeholders": {
+      "station": { "type": "String" }
+    }
+  },
+  "quickReportSubtitle": "한 번의 터치로 혼잡도 제보에 참여할 수 있어요",
+  "doLater": "나중에 할게요",
+  "quickReportCooldownAgain": "{time} 후 다시 제보할 수 있어요.",
+  "@quickReportCooldownAgain": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "quickReportSuccess": "[{station}] {level} 제보가 탑승 예상에 반영되었어요.",
+  "@quickReportSuccess": {
+    "placeholders": {
+      "station": { "type": "String" },
+      "level": { "type": "String" }
+    }
+  },
+  "recommendationReasonTitle": "이동 수단 추천 기준",
+  "wheelchairReservationCount": "휠체어 예약자 {count}명",
+  "@wheelchairReservationCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "wheelchairReservationExists": "휠체어 예약자 있음",
+  "reasonNoBusArrival": "현재 확인 가능한 버스 도착 정보가 없어, 도보 이동을 함께 고려해 주세요.",
+  "reasonNoWalkInfo": "도보 이동 정보를 확인할 수 없어, 현재 버스 도착 정보를 기준으로 안내합니다.",
+  "reasonTooManyWaiting": "대기 인원이 많아 가까운 버스 탑승이 어려울 수 있어, 도보 이동을 추천합니다.",
+  "reasonBusTimeFits": "버스 도착 시간과 다음 수업까지 남은 시간을 기준으로, 버스 이동을 추천합니다.",
+  "reasonWalkFaster": "예상 이동 시간이 더 짧아, 도보 이동을 추천합니다.",
+  "reasonBusTooLate": "버스 이동으로는 다음 수업 시간에 맞추기 어려워, 도보 이동을 추천합니다.",
+  "reasonBusFaster": "예상 이동 시간이 더 짧아, 버스 이동을 추천합니다.",
+  "reasonBusFasterThanWalk": "도보 이동보다 버스 이동의 예상 소요 시간이 더 짧아, 버스 이동을 추천합니다.",
+  "reasonNoNextClassBuilding": "다음 수업 건물 정보가 없어, 현재 선택한 정류장의 버스 도착 정보를 기준으로 안내합니다.",
+  "reasonMainGateEngineeringNoBus": "정문에서는 공학관 방향으로 바로 이동할 수 있는 버스 경로가 없어 도보 이동을 추천합니다.",
+  "reasonNextClassNearStop": "다음 수업 건물이 현재 선택한 정류장 근처에 있어 도보 이동을 추천합니다.",
+  "reasonNoBusRouteToNextClass": "현재 선택한 정류장에서는 다음 수업 건물 방향으로 이용할 수 있는 버스 경로가 없어 도보 이동을 추천합니다.",
+  "reasonBusRouteRecommended": "{routeText} 기준의 이동 시간 {minutes}분과 버스 대기 시간을 함께 계산해, 버스 이동을 추천합니다.",
+  "@reasonBusRouteRecommended": {
+    "placeholders": {
+      "routeText": { "type": "String" },
+      "minutes": { "type": "int" }
+    }
+  },
+  "capacityLowFloorAtStation": "저상버스 기준 {base}명\n{station} 예상 탑승 가능 {count}명",
+  "@capacityLowFloorAtStation": {
+    "placeholders": {
+      "base": { "type": "int" },
+      "station": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "capacitySeatsAtStation": "남은 좌석 {base}석\n{station} 예상 탑승 가능 {count}명",
+  "@capacitySeatsAtStation": {
+    "placeholders": {
+      "base": { "type": "int" },
+      "station": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "ruleMainGate80": "정문 80% 탑승 가정 기준 탑승 가능 예상",
+  "capacityJeonjeongdae": "남은 좌석 45석\n전정대 예상 탑승 인원 {count}명",
+  "@capacityJeonjeongdae": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "ruleJeonjeongdae": "출발 정류장 예상 탑승 인원 기준 탑승 가능 예상",
+  "noSeatInfo": "좌석 정보를 확인할 수 없습니다",
+  "capacityLowFloorAtStation": "저상버스 기준 {base}명\n{station} 예상 탑승 가능 {count}명",
+  "@capacityLowFloorAtStation": {
+    "placeholders": {
+      "base": { "type": "int" },
+      "station": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "capacitySeatsAtStation": "남은 좌석 {base}석\n{station} 예상 탑승 가능 {count}명",
+  "@capacitySeatsAtStation": {
+    "placeholders": {
+      "base": { "type": "int" },
+      "station": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "ruleMainGate80": "정문 80% 탑승 가정 기준 탑승 가능 예상",
+  "ruleMainGateBoardingReflected": "정문 예상 탑승 {count}명 반영 후 탑승 가능 예상",
+  "@ruleMainGateBoardingReflected": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
+}
