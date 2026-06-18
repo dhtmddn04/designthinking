@@ -122,6 +122,30 @@ abstract class AppLocalizations {
   /// **'English'**
   String get english;
 
+  /// No description provided for @homeTab.
+  ///
+  /// In ko, this message translates to:
+  /// **'홈'**
+  String get homeTab;
+
+  /// No description provided for @reservationTab.
+  ///
+  /// In ko, this message translates to:
+  /// **'예약'**
+  String get reservationTab;
+
+  /// No description provided for @reportTab.
+  ///
+  /// In ko, this message translates to:
+  /// **'제보'**
+  String get reportTab;
+
+  /// No description provided for @profileTab.
+  ///
+  /// In ko, this message translates to:
+  /// **'프로필'**
+  String get profileTab;
+
   /// No description provided for @login.
   ///
   /// In ko, this message translates to:

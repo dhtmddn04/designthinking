@@ -21,6 +21,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get english => 'English';
 
   @override
+  String get homeTab => 'Home';
+
+  @override
+  String get reservationTab => 'Reservation';
+
+  @override
+  String get reportTab => 'Report';
+
+  @override
+  String get profileTab => 'Profile';
+
+  @override
   String get login => 'Login';
 
   @override

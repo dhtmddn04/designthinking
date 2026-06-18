@@ -5,6 +5,7 @@ import 'home_screen.dart';
 import 'reservation_screen.dart';
 import 'opinion_screen.dart';
 import 'profile_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -179,6 +180,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isRestoringLogin) {
       return const Scaffold(
         backgroundColor: Colors.white,
@@ -232,18 +235,26 @@ class _MainScreenState extends State<MainScreen> {
         ),
         child: Row(
           children: [
-            _buildNavItem(index: 0, icon: Icons.home_outlined, label: '홈'),
+            _buildNavItem(
+              index: 0,
+              icon: Icons.home_outlined,
+              label: l10n.homeTab,
+            ),
             _buildNavItem(
               index: 1,
               icon: Icons.event_available_outlined,
-              label: '예약',
+              label: l10n.reservationTab,
             ),
             _buildNavItem(
               index: 2,
               icon: Icons.chat_bubble_outline,
-              label: '제보',
+              label: l10n.reportTab,
             ),
-            _buildNavItem(index: 3, icon: Icons.person_outline, label: '프로필'),
+            _buildNavItem(
+              index: 3,
+              icon: Icons.person_outline,
+              label: l10n.profileTab,
+            ),
           ],
         ),
       ),

@@ -21,6 +21,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get english => 'English';
 
   @override
+  String get homeTab => '홈';
+
+  @override
+  String get reservationTab => '예약';
+
+  @override
+  String get reportTab => '제보';
+
+  @override
+  String get profileTab => '프로필';
+
+  @override
   String get login => '로그인';
 
   @override
