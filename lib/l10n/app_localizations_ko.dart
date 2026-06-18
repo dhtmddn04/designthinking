@@ -859,4 +859,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String ruleMainGateBoardingReflected(int count) {
     return '정문 예상 탑승 $count명 반영 후 탑승 가능 예상';
   }
+
+  @override
+  String get signupFailedTitle => '회원가입 실패';
+
+  @override
+  String get duplicateUsernameMessage => '이미 사용 중인 아이디입니다.';
+
+  @override
+  String get signupCompletedMessage => '회원가입이 완료되었습니다.';
+
+  @override
+  String get signupFailedMessage => '회원가입에 실패했습니다.';
 }

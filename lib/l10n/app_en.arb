@@ -485,5 +485,9 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+  "signupFailedTitle": "Sign-up Failed",
+  "duplicateUsernameMessage": "This ID is already in use.",
+  "signupCompletedMessage": "Sign-up completed.",
+  "signupFailedMessage": "Failed to sign up."
 }

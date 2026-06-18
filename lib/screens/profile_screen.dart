@@ -858,11 +858,48 @@ class _SignupViewState extends State<SignupView> {
                       }
 
                       try {
+                        final l10n = AppLocalizations.of(context)!;
+
                         final result = await ApiService.signup(
                           username: username,
                           password: password,
                           phone: phone,
                           needsWheelchair: _needsWheelchair,
+                        );
+
+                        if (result['success'] == true) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.signupCompletedMessage),
+                            ),
+                          );
+
+                          Navigator.pop(context);
+                          return;
+                        }
+
+                        if (result['statusCode'] == 409) {
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              return AlertDialog(
+                                title: Text(l10n.signupFailedTitle),
+                                content: Text(l10n.duplicateUsernameMessage),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: Text(l10n.ok),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                          return;
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['message'] ?? '회원가입에 실패했습니다.'),
+                          ),
                         );
 
                         if (!context.mounted) return;

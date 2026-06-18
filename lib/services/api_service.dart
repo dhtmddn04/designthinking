@@ -24,7 +24,9 @@ class ApiService {
       }),
     );
 
-    return jsonDecode(response.body);
+    final Map<String, dynamic> data = jsonDecode(response.body);
+
+    return {...data, 'statusCode': response.statusCode};
   }
 
   static Future<Map<String, dynamic>> login({
@@ -48,10 +50,7 @@ class ApiService {
     final response = await http.put(
       Uri.parse('$baseUrl/auth/profile/$userId'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'needsWheelchair': needsWheelchair,
-      }),
+      body: jsonEncode({'phone': phone, 'needsWheelchair': needsWheelchair}),
     );
 
     return jsonDecode(response.body);
