@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../services/locale_controller.dart';
 import 'home_screen.dart';
 import 'reservation_screen.dart';
 import 'opinion_screen.dart';
@@ -19,6 +19,7 @@ class _MainScreenState extends State<MainScreen> {
   static const String _usernameKey = 'username';
   static const String _phoneKey = 'phone';
   static const String _needsWheelchairKey = 'needsWheelchair';
+  static const String _languageCodeKey = 'languageCode';
 
   final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
 
@@ -30,6 +31,7 @@ class _MainScreenState extends State<MainScreen> {
   String? currentUsername;
   String? currentPhone;
   bool currentNeedsWheelchair = false;
+  String languageCode = 'ko';
 
   bool _isRestoringLogin = true;
 
@@ -47,10 +49,14 @@ class _MainScreenState extends State<MainScreen> {
       final String? savedPhone = await _prefs.getString(_phoneKey);
       final bool savedNeedsWheelchair =
           await _prefs.getBool(_needsWheelchairKey) ?? false;
+      final String savedLanguageCode =
+          await _prefs.getString(_languageCodeKey) ?? 'ko';
 
       if (!mounted) return;
 
       setState(() {
+        languageCode = savedLanguageCode;
+
         if (autoLogin && savedUserId != null && savedUsername != null) {
           currentUserId = savedUserId;
           currentUsername = savedUsername;
@@ -94,9 +100,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _handleLoginSuccess(
-      Map<String, dynamic> user,
-      bool autoLogin,
-      ) async {
+    Map<String, dynamic> user,
+    bool autoLogin,
+  ) async {
     final int userId = user['id'] as int;
     final String username = user['username']?.toString() ?? '';
     final String phone = user['phone']?.toString() ?? '';
@@ -123,7 +129,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _handleProfileUpdated(Map<String, dynamic> user) async {
-    final String username = user['username']?.toString() ?? currentUsername ?? '';
+    final String username =
+        user['username']?.toString() ?? currentUsername ?? '';
     final String phone = user['phone']?.toString() ?? '';
     final bool needsWheelchair = user['needsWheelchair'] == true;
 
@@ -158,14 +165,24 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  Future<void> _handleLanguageChanged(String code) async {
+    if (code != 'ko' && code != 'en') return;
+
+    await LocaleController.setLocale(code);
+
+    if (!mounted) return;
+
+    setState(() {
+      languageCode = code;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isRestoringLogin) {
       return const Scaffold(
         backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -180,15 +197,14 @@ class _MainScreenState extends State<MainScreen> {
         userId: currentUserId,
         needsWheelchair: currentNeedsWheelchair,
       ),
-      OpinionScreen(
-        key: ValueKey(currentUserId),
-        userId: currentUserId,
-      ),
+      OpinionScreen(key: ValueKey(currentUserId), userId: currentUserId),
       ProfileScreen(
         userId: currentUserId,
         username: currentUsername,
         phone: currentPhone,
         needsWheelchair: currentNeedsWheelchair,
+        languageCode: languageCode,
+        onLanguageChanged: _handleLanguageChanged,
         onLoginSuccess: _handleLoginSuccess,
         onLogoutSuccess: _handleLogoutSuccess,
         onProfileUpdated: _handleProfileUpdated,
@@ -198,10 +214,7 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: IndexedStack(
-          index: selectedIndex,
-          children: screens,
-        ),
+        child: IndexedStack(index: selectedIndex, children: screens),
       ),
       bottomNavigationBar: Container(
         height: 72,
@@ -215,20 +228,11 @@ class _MainScreenState extends State<MainScreen> {
               spreadRadius: 0,
             ),
           ],
-          border: Border(
-            top: BorderSide(
-              color: Color(0xFFE5E7EB),
-              width: 1,
-            ),
-          ),
+          border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
         ),
         child: Row(
           children: [
-            _buildNavItem(
-              index: 0,
-              icon: Icons.home_outlined,
-              label: '홈',
-            ),
+            _buildNavItem(index: 0, icon: Icons.home_outlined, label: '홈'),
             _buildNavItem(
               index: 1,
               icon: Icons.event_available_outlined,
@@ -239,11 +243,7 @@ class _MainScreenState extends State<MainScreen> {
               icon: Icons.chat_bubble_outline,
               label: '제보',
             ),
-            _buildNavItem(
-              index: 3,
-              icon: Icons.person_outline,
-              label: '프로필',
-            ),
+            _buildNavItem(index: 3, icon: Icons.person_outline, label: '프로필'),
           ],
         ),
       ),
@@ -277,11 +277,7 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 26,
-              color: color,
-            ),
+            Icon(icon, size: 26, color: color),
             const SizedBox(height: 2),
             Text(
               label,
