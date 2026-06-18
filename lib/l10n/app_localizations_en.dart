@@ -894,4 +894,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String ruleMainGateBoardingReflected(int count) {
     return 'After $count boarded at Main Gate';
   }
+
+  @override
+  String get signupFailedTitle => 'Sign-up Failed';
+
+  @override
+  String get duplicateUsernameMessage => 'This ID is already in use.';
+
+  @override
+  String get signupCompletedMessage => 'Sign-up completed.';
+
+  @override
+  String get signupFailedMessage => 'Failed to sign up.';
 }

@@ -1639,6 +1639,30 @@ abstract class AppLocalizations {
   /// In ko, this message translates to:
   /// **'정문 예상 탑승 {count}명 반영 후 탑승 가능 예상'**
   String ruleMainGateBoardingReflected(int count);
+
+  /// No description provided for @signupFailedTitle.
+  ///
+  /// In ko, this message translates to:
+  /// **'회원가입 실패'**
+  String get signupFailedTitle;
+
+  /// No description provided for @duplicateUsernameMessage.
+  ///
+  /// In ko, this message translates to:
+  /// **'이미 사용 중인 아이디입니다.'**
+  String get duplicateUsernameMessage;
+
+  /// No description provided for @signupCompletedMessage.
+  ///
+  /// In ko, this message translates to:
+  /// **'회원가입이 완료되었습니다.'**
+  String get signupCompletedMessage;
+
+  /// No description provided for @signupFailedMessage.
+  ///
+  /// In ko, this message translates to:
+  /// **'회원가입에 실패했습니다.'**
+  String get signupFailedMessage;
 }
 
 class _AppLocalizationsDelegate

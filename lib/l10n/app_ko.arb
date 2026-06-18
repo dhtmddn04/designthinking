@@ -502,5 +502,9 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+  "signupFailedTitle": "회원가입 실패",
+  "duplicateUsernameMessage": "이미 사용 중인 아이디입니다.",
+  "signupCompletedMessage": "회원가입이 완료되었습니다.",
+  "signupFailedMessage": "회원가입에 실패했습니다."
 }
